@@ -34,6 +34,13 @@ case "$DB" in
   *@db.*.supabase.co*) falha "SUPABASE_DB_URL é a Direct connection (só IPv6, não conecta daqui). Use a do Session pooler" ;;
 esac
 SB_URL="${NEXT_PUBLIC_SUPABASE_URL%/}"
+# Algumas telas do Supabase mostram a URL já com /rest/v1. Com caminho no fim o
+# app quebra (o supabase-js acrescenta os caminhos sozinho) e a criação do dono
+# cai no PostgREST: medido na 1ª instalação, HTTP 404 PGRST125 "Invalid path".
+case "$SB_URL" in
+  http://*/*|https://*/*)
+    falha "NEXT_PUBLIC_SUPABASE_URL tem um caminho no fim ($(printf '%s' "$SB_URL" | sed -E 's#^https?://[^/]+##')). Use só o endereço do projeto, ex.: https://abcdefgh.supabase.co" ;;
+esac
 
 # ── 0. Conexão ──────────────────────────────────────────────────────────────
 log "testando a conexão com o banco"
