@@ -1,0 +1,35 @@
+# Caddy atrás do Traefik do EasyPanel: sem HTTPS próprio (o Traefik termina o
+# TLS e emite o certificado), ouvindo HTTP na porta 80 da rede interna.
+# As regras são as do Caddyfile da raiz; ver os comentários de lá.
+
+{
+	auto_https off
+	admin off
+	servers {
+		# Mantém o X-Forwarded-For/Proto que o Traefik manda (IP real do
+		# cliente e "https"), em vez de trocar pelo IP do próprio Traefik.
+		trusted_proxies static private_ranges
+	}
+}
+
+:80 {
+	encode gzip
+
+	route {
+		# O webhook GLOBAL do WAHA não é publicado: o WAHA fala com o app pela
+		# rede interna. Aberto, qualquer um injetaria mensagem falsa no CRM.
+		@waha_global path /api/v1/webhooks/waha
+		respond @waha_global 403
+
+		# O runner do agente de IA pode levar até ~5min por requisição.
+		@agentrun path /api/internal/agents/run*
+		reverse_proxy @agentrun app:3000 {
+			transport http {
+				read_timeout 320s
+				write_timeout 320s
+			}
+		}
+
+		reverse_proxy app:3000
+	}
+}
