@@ -77,19 +77,28 @@ services:
       start_period: 20s
     logging: *default-logging
 
+  # SEM `${VAR}` de segredo neste arquivo, em nenhum serviço. A checagem de
+  # problemas do EasyPanel interpola o compose sem ler o `.env` (medido: acusa
+  # "variable is not set" até para variável presente no Environment), então
+  # segredo interpolado vira aviso no painel e, se o deploy fizer o mesmo,
+  # string vazia no contêiner. Quem precisa de segredo lê pelo `env_file`.
   waha:
     mem_limit: 1280m
     image: ${WAHA_IMAGE:-devlikeapro/waha:latest-2026.7.2}
     restart: unless-stopped
+    # Traz WAHA_API_KEY em texto puro, o mesmo valor que o app manda no
+    # X-Api-Key: o WAHA compara literal e confere. (O prod usa o hash com o
+    # prefixo sha512:, que exigiria interpolar WAHA_API_KEY_SHA512.)
+    # WHATSAPP_HOOK_HMAC fica de fora: o WAHA Core não assina o webhook mesmo
+    # com ele (lib/waha/webhook-auth.ts), e o app aceita evento sem assinatura.
+    env_file: .env
     environment:
-      WAHA_API_KEY: "sha512:${WAHA_API_KEY_SHA512}"
       # Interno: o WAHA fala com o app pela rede do compose, nunca pela internet.
-      WHATSAPP_HOOK_URL: ${WAHA_WEBHOOK_BASE_URL:-http://app:3000}/api/v1/webhooks/waha
+      WHATSAPP_HOOK_URL: http://app:3000/api/v1/webhooks/waha
       WHATSAPP_HOOK_EVENTS: "message.any,message.ack,message.edited,message.revoked,session.status,state.change"
-      WHATSAPP_HOOK_HMAC: ${WAHA_HMAC_SECRET}
-      WHATSAPP_DEFAULT_ENGINE: ${WHATSAPP_DEFAULT_ENGINE:-NOWEB}
+      WHATSAPP_DEFAULT_ENGINE: NOWEB
       WAHA_DASHBOARD_ENABLED: "false"
-      WHATSAPP_RESTART_ALL_SESSIONS: "${WHATSAPP_RESTART_ALL_SESSIONS:-True}"
+      WHATSAPP_RESTART_ALL_SESSIONS: "True"
     volumes:
       - waha-data:/app/.sessions
       - waha-media:/app/.media
@@ -109,9 +118,10 @@ services:
   srh:
     image: hiett/serverless-redis-http@sha256:5b0bb9239fce53abf87b2018a7a0deb9ec7bd900c5360738fe5fbeeb426f9150
     restart: unless-stopped
+    # SRH_TOKEN vem do .env (é o mesmo valor de UPSTASH_REDIS_REST_TOKEN do app).
+    env_file: .env
     environment:
       SRH_MODE: env
-      SRH_TOKEN: ${SRH_TOKEN}
       SRH_CONNECTION_STRING: "redis://redis:6379"
     depends_on:
       redis:
@@ -125,9 +135,10 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    # INTERNAL_SECRET vem do .env: sem ele os crons levam 401 em silêncio.
+    env_file: .env
     environment:
       TZ: UTC
-      INTERNAL_SECRET: ${INTERNAL_SECRET}
     logging: *default-logging
 
   caddy:
