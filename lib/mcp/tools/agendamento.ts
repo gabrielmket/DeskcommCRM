@@ -179,6 +179,12 @@ const horariosLivresShape = {
     .describe(`quantos horários no máximo (padrão ${HORARIOS_PADRAO})`),
 };
 
+/** YYYY-MM-DD que existe no calendário e não é o zero-valor que o modelo às vezes manda. */
+function diaCivilValido(dia: string): boolean {
+  const d = new Date(`${dia}T00:00:00.000Z`);
+  return !Number.isNaN(d.getTime()) && d.getUTCFullYear() >= 2000 && d.toISOString().slice(0, 10) === dia;
+}
+
 export const crmFindFreeSlots: McpToolDefinition<typeof horariosLivresShape> = {
   name: "crm_find_free_slots",
   description:
@@ -205,24 +211,30 @@ export const crmFindFreeSlots: McpToolDefinition<typeof horariosLivresShape> = {
   requiresScope: "mcp:read",
   handler: async (input, ctx) => {
     const agora = new Date();
-    if (input.dia !== undefined && input.dias_a_frente !== undefined) {
-      return {
-        horarios: [],
-        motivo: "periodo_ambiguo",
-        mensagem: "informe um dia específico ou quantos dias olhar, não os dois.",
-      };
-    }
+    // Dia E período juntos: VALE O DIA. Recusar com `periodo_ambiguo` era o
+    // desenho anterior, e travou o agendamento em produção (Time Company,
+    // 2026-09-15): o cliente disse "amanhã à tarde", o modelo mandou
+    // `dia: "2026-09-16"` junto de `dias_a_frente`, recebeu a recusa e repetiu o
+    // MESMO par 14 vezes em três turnos — com gpt-5.6-luna e depois com
+    // gpt-5.6-terra — até desistir dizendo que "a equipe confirma os horários",
+    // com quatro horários livres naquela tarde. O dia é o pedido mais específico;
+    // o período é o campo que o modelo preenche por hábito.
+    //
+    // Dia que não é data de verdade ("0000-00-00", "0001-01-01", ambos medidos no
+    // mesmo turno) passa pela regex mas não é pedido de ninguém: é descartado e a
+    // consulta cai no período relativo, que é o caminho padrão.
+    const dia = input.dia !== undefined && diaCivilValido(input.dia) ? input.dia : undefined;
+    const diasAFrente = dia === undefined ? input.dias_a_frente : undefined;
 
     // A faixa larga contém o dia civil em QUALQUER fuso. Depois de a coleta
     // revelar o fuso da regra, filtramos pelo mesmo dia local. Assim a IA não
     // converte "13/09" em meia-noite UTC e não perde a noite de Manaus.
-    const inicioDoDiaUtc =
-      input.dia === undefined ? null : new Date(`${input.dia}T00:00:00.000Z`);
+    const inicioDoDiaUtc = dia === undefined ? null : new Date(`${dia}T00:00:00.000Z`);
     const de =
       inicioDoDiaUtc === null ? agora : new Date(inicioDoDiaUtc.getTime() - 14 * 60 * 60 * 1000);
     const ate =
       inicioDoDiaUtc === null
-        ? new Date(de.getTime() + (input.dias_a_frente ?? DIAS_PADRAO) * 86_400_000)
+        ? new Date(de.getTime() + (diasAFrente ?? DIAS_PADRAO) * 86_400_000)
         : new Date(inicioDoDiaUtc.getTime() + 38 * 60 * 60 * 1000);
 
     const consulta = await horariosLivresDaOrg(ctx.supabase, ctx.organizationId, {
@@ -250,9 +262,9 @@ export const crmFindFreeSlots: McpToolDefinition<typeof horariosLivresShape> = {
     // Rotular com outro faria `quando` discordar de `fuso_da_regra` na mesma
     // resposta.
     const slotsDoPeriodo =
-      input.dia === undefined
+      dia === undefined
         ? consulta.slots
-        : consulta.slots.filter((s) => diaLocalISO(s.inicio, consulta.fusoDaRegra) === input.dia);
+        : consulta.slots.filter((s) => diaLocalISO(s.inicio, consulta.fusoDaRegra) === dia);
     const escolhidos = espalhaPorDia(
       slotsDoPeriodo,
       consulta.fusoDaRegra,

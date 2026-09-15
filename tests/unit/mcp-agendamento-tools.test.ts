@@ -140,14 +140,26 @@ describe("crm_find_free_slots", () => {
     expect(params.ate.toISOString()).toBe("2026-09-14T14:00:00.000Z");
   });
 
-  it("não aceita dia específico e período relativo juntos", async () => {
+  it("dia específico e período relativo juntos: vale o dia (não trava o agendamento)", async () => {
+    // Produção (Time Company, 2026-09-15): a recusa `periodo_ambiguo` fez o modelo
+    // repetir o mesmo par 14 vezes e desistir de marcar com horários livres.
+    respondeCom(SUCESSO);
     const r = (await crmFindFreeSlots.handler(
       { event_type_slug: "c", dia: "2026-09-13", dias_a_frente: 7 },
       ctx,
-    )) as { motivo: string; mensagem: string };
-    expect(r.motivo).toBe("periodo_ambiguo");
-    expect(r.mensagem).toMatch(/não os dois/);
-    expect(horariosLivresDaOrg).not.toHaveBeenCalled();
+    )) as { motivo?: string };
+    expect(r.motivo).toBeUndefined();
+    const params = vi.mocked(horariosLivresDaOrg).mock.calls[0]![2];
+    // A mesma janela larga do dia civil — não os 7 dias do período.
+    expect(params.de.toISOString()).toBe("2026-09-12T10:00:00.000Z");
+    expect(params.ate.toISOString()).toBe("2026-09-14T14:00:00.000Z");
+  });
+
+  it("dia que não é data de verdade (0000-00-00) é ignorado e vale o período", async () => {
+    respondeCom(SUCESSO);
+    await crmFindFreeSlots.handler({ event_type_slug: "c", dia: "0000-00-00", dias_a_frente: 3 }, ctx);
+    const params = vi.mocked(horariosLivresDaOrg).mock.calls[0]![2];
+    expect(Math.round((params.ate.getTime() - params.de.getTime()) / 86_400_000)).toBe(3);
   });
 
   it("⚠️ a recusa que sai é a do CLIENTE, nunca a do OPERADOR", async () => {
