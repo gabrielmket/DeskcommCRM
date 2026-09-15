@@ -39,7 +39,9 @@ services:
     mem_limit: 768m
     # Versão NUMERADA do build deste fork (tag git vX.Y.Z-tc.N → publish-image.yml),
     # nunca `latest`/`main`: pull_policy é `missing`, então tag móvel não seria
-    # puxada de novo. Voltar ao autor: ghcr.io/melgarafael/deskcommcrm:1.21.0.
+    # puxada de novo. Voltar ao autor: trocar o dono gabrielmket por melgarafael
+    # e a tag por 1.21.0 (o endereço inteiro do autor não pode ser escrito aqui:
+    # tests/unit/namespace-das-imagens.test.ts só o aceita nos arquivos âncora).
     image: ${APP_IMAGE:-ghcr.io/gabrielmket/deskcommcrm:1.21.0-tc.3}
     pull_policy: missing
     restart: unless-stopped
