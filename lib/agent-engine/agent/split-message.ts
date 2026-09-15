@@ -1,43 +1,55 @@
 /**
- * Quebra o texto da resposta em "bolhas" curtas (Onda 4) — parágrafo → sentença
- * → palavra, juntando pedaços adjacentes que caibam em maxChars. Puro. Usado no
- * send do agente quando split_messages está on; o pacing anti-ban espaça cada
- * bolha. Nunca devolve bolha vazia nem (salvo palavra atômica gigante) > maxChars.
+ * Quebra o texto da resposta em "bolhas" curtas (Onda 4). Puro. Usado no send do
+ * agente quando split_messages está on; o pacing anti-ban espaça cada bolha.
+ * Nunca devolve bolha vazia nem (salvo palavra atômica gigante) > maxChars.
+ *
+ * O PARÁGRAFO é a bolha. A linha em branco que o modelo escreve é a decisão dele
+ * de onde uma mensagem acaba e a próxima começa — é o formato que o prompt pede
+ * ("separe cada balão com uma linha em branco"). A versão anterior só quebrava
+ * texto acima de maxChars e JUNTAVA parágrafos adjacentes que coubessem, então
+ * uma resposta curta de três parágrafos saía num balão único: medido em produção
+ * (Time Company, 2026-09-15), "Oi! Sou a Rafa…" e "Com quem eu falo?" chegavam
+ * colados, com a linha em branco dentro de uma mensagem só. Nenhum valor de
+ * maxChars resolvia: baixo o bastante para separar os parágrafos, ele passava a
+ * picotar frase no meio.
+ *
+ * Dentro de um parágrafo que estoura maxChars continua a escada de antes
+ * (sentença → palavra, juntando os pedaços que couberem) — mas nunca atravessando
+ * a fronteira do parágrafo. Quebra de linha simples (lista, endereço) não separa.
  */
 export function splitIntoBubbles(text: string, maxChars: number): string[] {
   const trimmed = (text ?? "").trim();
   if (trimmed === "") return [];
-  if (trimmed.length <= maxChars) return [trimmed];
 
-  // Unidades atômicas: parágrafos → sentenças. Cada unidade que ainda estoura é
-  // quebrada por palavra.
-  const units: string[] = [];
+  const bubbles: string[] = [];
   for (const para of trimmed.split(/\n{2,}/)) {
     const p = para.trim();
     if (p === "") continue;
     if (p.length <= maxChars) {
-      units.push(p);
+      bubbles.push(p);
       continue;
     }
+
+    // Parágrafo longo: sentenças; a que ainda estoura é quebrada por palavra.
+    const units: string[] = [];
     for (const sentence of splitSentences(p)) {
       if (sentence.length <= maxChars) units.push(sentence);
       else units.push(...splitWords(sentence, maxChars));
     }
-  }
 
-  // Junta unidades adjacentes enquanto couberem (com espaço).
-  const bubbles: string[] = [];
-  let cur = "";
-  for (const u of units) {
-    const joined = cur === "" ? u : `${cur} ${u}`;
-    if (joined.length <= maxChars) {
-      cur = joined;
-    } else {
-      if (cur !== "") bubbles.push(cur);
-      cur = u;
+    // Junta unidades adjacentes DO MESMO parágrafo enquanto couberem (com espaço).
+    let cur = "";
+    for (const u of units) {
+      const joined = cur === "" ? u : `${cur} ${u}`;
+      if (joined.length <= maxChars) {
+        cur = joined;
+      } else {
+        if (cur !== "") bubbles.push(cur);
+        cur = u;
+      }
     }
+    if (cur !== "") bubbles.push(cur);
   }
-  if (cur !== "") bubbles.push(cur);
   return bubbles;
 }
 

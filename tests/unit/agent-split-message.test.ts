@@ -15,6 +15,26 @@ describe("splitIntoBubbles", () => {
     const out = splitIntoBubbles("Primeiro parágrafo.\n\nSegundo parágrafo.", 30);
     expect(out).toEqual(["Primeiro parágrafo.", "Segundo parágrafo."]);
   });
+  it("cada parágrafo vira uma bolha mesmo quando o texto inteiro cabe no teto", () => {
+    // Produção (Time Company, 2026-09-15): resposta curta de dois parágrafos
+    // chegava num balão único, com a linha em branco dentro dele.
+    const out = splitIntoBubbles(
+      "Oi! Sou a Rafa, assistente virtual da Time Company.\n\nCom quem eu falo? Assim já te atendo do jeito certo.",
+      600,
+    );
+    expect(out).toEqual([
+      "Oi! Sou a Rafa, assistente virtual da Time Company.",
+      "Com quem eu falo? Assim já te atendo do jeito certo.",
+    ]);
+  });
+  it("parágrafo longo quebra por sentença sem colar no parágrafo seguinte", () => {
+    const out = splitIntoBubbles("Primeira frase longa aqui. Segunda frase longa aqui.\n\nCurto.", 30);
+    expect(out).toEqual(["Primeira frase longa aqui.", "Segunda frase longa aqui.", "Curto."]);
+  });
+  it("quebra de linha simples (lista) não separa bolha", () => {
+    const out = splitIntoBubbles("Temos três opções:\n- Mia\n- Growth\n- Sites", 600);
+    expect(out).toEqual(["Temos três opções:\n- Mia\n- Growth\n- Sites"]);
+  });
   it("nenhuma bolha excede maxChars (quebra por sentença)", () => {
     const text = "Oi! Como você está hoje? Queria falar do seu pedido. Ele já saiu para entrega.";
     const out = splitIntoBubbles(text, 30);
