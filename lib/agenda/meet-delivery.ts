@@ -30,16 +30,72 @@ function requireCurrentPolicy(raw: unknown) {
   }
   return p;
 }
-function requirePolicy(raw: unknown): { humanCommand: boolean; contactId: string; channelSessionId: string } {
+/**
+ * O que o gate do PRÉ-LANÇAMENTO precisa e a policy SQL não devolve: o modo do
+ * canal (`ai_gate_mode`), a lista de telefones de teste e o telefone do contato.
+ *
+ * Sem isto a entrega do link avaliava o canal em pré-lançamento como allowlist
+ * pura e exigia `ai_authorized_at`, que o número de teste não tem — enquanto o
+ * turno (consulta-pg.ts) passa os três campos e deixa o número de teste
+ * conversar. Resultado medido (Time Company, 2026-09-15): o agente marcou duas
+ * reuniões com números da lista de teste, o Meet ficou pronto, e as duas entregas
+ * do link terminaram `blocked:sem_autorizacao`. A regra continua sendo a MESMA
+ * (`montarEstadoDeElegibilidade` + `decidirElegibilidade`); só passa a receber o
+ * mesmo estado que o turno recebe.
+ */
+interface AcessoDoCanal {
+  metadata: Record<string, unknown> | null;
+  telefone: string | null;
+}
+type LerAcessoDoCanal = (contactId: string, channelSessionId: string) => Promise<AcessoDoCanal | null>;
+
+async function requirePolicy(
+  raw: unknown,
+  lerAcesso: LerAcessoDoCanal,
+): Promise<{ humanCommand: boolean; contactId: string; channelSessionId: string }> {
   const p = requireCurrentPolicy(raw);
   if (p.human_command === true) return { humanCommand: true, contactId: p.contact_id, channelSessionId: p.channel_session_id };
+  const acesso = await lerAcesso(p.contact_id, p.channel_session_id);
   const result = decidirElegibilidade(montarEstadoDeElegibilidade({
-    aiGate: p.ai_gate, forceHuman: p.force_human, assigneeKind: p.assignee_kind ?? null,
+    aiGate: p.ai_gate,
+    aiGateMode: acesso?.metadata?.["ai_gate_mode"],
+    aiTestPhoneNumbers: acesso?.metadata?.["ai_test_phone_numbers"],
+    contactPhoneNumber: acesso?.telefone ?? null,
+    forceHuman: p.force_human, assigneeKind: p.assignee_kind ?? null,
     botSilencedUntil: p.bot_silenced_until, aiAuthorizedAt: p.ai_authorized_at,
     agora: new Date(), ttlMs: ttlDaAutorizacaoMs(process.env),
   }));
   if (!result.permite) throw new MeetingDeliveryBlockedError(result.motivo);
   return { humanCommand: false, contactId: p.contact_id, channelSessionId: p.channel_session_id };
+}
+
+function lerAcessoDoCanalPg(db: Queryable, organizationId: string): LerAcessoDoCanal {
+  return async (contactId, channelSessionId) => {
+    const { rows } = await db.query<{ metadata: Record<string, unknown> | null; phone_number: string | null }>(
+      `select cs.metadata, ct.phone_number
+         from channel_sessions cs
+         join contacts ct on ct.organization_id = cs.organization_id and ct.id = $3
+        where cs.organization_id = $1 and cs.id = $2`,
+      [organizationId, channelSessionId, contactId],
+    );
+    const r = rows[0];
+    return r ? { metadata: r.metadata, telefone: r.phone_number } : null;
+  };
+}
+
+function lerAcessoDoCanalSupabase(db: SupabaseClient, organizationId: string): LerAcessoDoCanal {
+  return async (contactId, channelSessionId) => {
+    const [canal, contato] = await Promise.all([
+      db.from("channel_sessions").select("metadata").eq("organization_id", organizationId).eq("id", channelSessionId).maybeSingle(),
+      db.from("contacts").select("phone_number").eq("organization_id", organizationId).eq("id", contactId).maybeSingle(),
+    ]);
+    if (canal.error) throw canal.error;
+    if (contato.error) throw contato.error;
+    return {
+      metadata: (canal.data?.metadata as Record<string, unknown> | null | undefined) ?? null,
+      telefone: (contato.data?.phone_number as string | null | undefined) ?? null,
+    };
+  };
 }
 /** Só reconhecimento de recibo: não autoriza transporte, mas conserva dados,
  * intenção, atendimento e aquisição originais pelo mesmo predicado do settle. */
@@ -54,7 +110,7 @@ async function readMeetingPolicyPg(db: Queryable, c: MeetingDeliveryContext): Pr
   return rows[0]?.policy;
 }
 export async function assertMeetingDeliveryPg(db: Queryable, c: MeetingDeliveryContext) {
-  return requirePolicy(await readMeetingPolicyPg(db, c));
+  return requirePolicy(await readMeetingPolicyPg(db, c), lerAcessoDoCanalPg(db, c.organizationId));
 }
 export async function assertMeetingDeliverySupabase(db: SupabaseClient, c: MeetingDeliveryContext) {
   const { data, error } = await db.rpc("fn_meet_delivery_policy", {
@@ -62,7 +118,7 @@ export async function assertMeetingDeliverySupabase(db: SupabaseClient, c: Meeti
     p_acquired_at: c.jobClaim.acquired_at,
   });
   if (error) throw error;
-  return requirePolicy(data);
+  return requirePolicy(data, lerAcessoDoCanalSupabase(db, c.organizationId));
 }
 
 export interface MeetingBookingContext {

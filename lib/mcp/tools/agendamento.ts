@@ -37,6 +37,7 @@ import {
 import { ApiError } from "@/lib/api/types";
 import { SITUACOES_DO_AGENDAMENTO } from "@/lib/agenda/tipos";
 import type { McpToolDefinition } from "@/lib/mcp/types";
+import { emailInformadoSchema, gravarEmailDoContato } from "./email-do-contato";
 
 /** Teto do horizonte pedido — espelha o da rota, e o excesso é erro de chamada. */
 const DIAS_PADRAO = 14;
@@ -443,6 +444,14 @@ const marcarShape = {
   owner_user_id: z.string().uuid().optional(),
   title: z.string().min(1).max(200).optional(),
   notes: z.string().max(2000).optional(),
+  /**
+   * O convidado do Google. O handler e a tela já tinham o campo; a ferramenta
+   * da IA não, e o agente pedia o e-mail "para o convite" sem ter como mandá-lo:
+   * o evento nascia no Google sem convidado (Time Company, 2026-09-15).
+   */
+  guest_email: emailInformadoSchema
+    .optional()
+    .describe("o e-mail que a pessoa informou para receber o convite da reunião; ela recebe o convite do Google"),
 };
 
 export const crmBookAppointment: McpToolDefinition<typeof marcarShape> = {
@@ -480,9 +489,20 @@ export const crmBookAppointment: McpToolDefinition<typeof marcarShape> = {
           ...(input.owner_user_id ? { owner_user_id: input.owner_user_id } : {}),
           ...(input.title ? { title: input.title } : {}),
           ...(input.notes ? { notes: input.notes } : {}),
+          ...(input.guest_email ? { guest_email: input.guest_email } : {}),
         },
       );
-      return { marcado: true, compromisso: r, ...(r.meeting_state === "pending" ? { mensagem: "O compromisso foi marcado; o link ainda está sendo criado. Não invente um link nem afirme que ele já foi enviado." } : {}) };
+      // O e-mail do convite também vai para o cadastro do contato; falhar aqui
+      // não desfaz a reunião, que já está marcada.
+      const emailNoCadastro = input.guest_email
+        ? (await gravarEmailDoContato(ctx, input.contact_id, input.guest_email)).gravado
+        : undefined;
+      return {
+        marcado: true,
+        compromisso: r,
+        ...(emailNoCadastro !== undefined ? { email_no_cadastro: emailNoCadastro } : {}),
+        ...(r.meeting_state === "pending" ? { mensagem: "O compromisso foi marcado; o link ainda está sendo criado. Não invente um link nem afirme que ele já foi enviado." } : {}),
+      };
     }),
 };
 

@@ -291,6 +291,32 @@ describe("as escritas de agenda", () => {
     expect(r.mensagem).toMatch(/crm_find_free_slots/);
   });
 
+  it("o e-mail informado vira convidado do Google, e falhar no cadastro não desfaz a reunião", async () => {
+    // Produção (Time Company, 2026-09-15): o agente pedia o e-mail "para o convite"
+    // e a ferramenta não tinha o campo — o evento nascia sem convidado.
+    vi.mocked(idDoTipoPorSlug).mockResolvedValue({ id: "t-1", nome: "Diagnóstico" });
+    vi.mocked(handlers.marcarAgendamentoHandler).mockResolvedValue(
+      { id: "ag-1", meeting_state: "not_requested" } as never,
+    );
+
+    const r = (await crmBookAppointment.handler(
+      {
+        event_type_slug: "diagnostico",
+        starts_at: "2026-09-16T17:40:00Z",
+        contact_id: "c-1",
+        guest_email: "cliente@exemplo.com",
+      },
+      ctx,
+    )) as { marcado: boolean; email_no_cadastro?: boolean };
+
+    expect(vi.mocked(handlers.marcarAgendamentoHandler).mock.calls[0]![2]).toMatchObject({
+      guest_email: "cliente@exemplo.com",
+    });
+    expect(r.marcado).toBe(true);
+    // O dublê do client não grava nada: a gravação falha e a reunião continua marcada.
+    expect(r.email_no_cadastro).toBe(false);
+  });
+
   it("cada código traz o ensino DELE, não uma frase genérica", async () => {
     // Recusa que só nega faz o modelo tentar de novo IGUAL — é o caso medido em
     // `retencao.ts`, onde ele repetiu a mesma data de 2023 e queimou o turno.

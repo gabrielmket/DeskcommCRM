@@ -16,6 +16,7 @@ import {
 import type { McpToolDefinition } from "../types";
 import { CAMPOS_PROPONIVEIS, proporDadoDoContato } from "@/lib/contacts/proposta-de-dado";
 import { audit } from "@/lib/audit";
+import { gravarEmailDoContato } from "./email-do-contato";
 
 const searchInputShape = {
   query: z.string().min(1).max(200).describe("Termo de busca (nome, email ou telefone)."),
@@ -133,16 +134,24 @@ const propostaShape = {
 export const crmProposeContactField: McpToolDefinition<typeof propostaShape> = {
   name: "crm_propose_contact_field",
   description:
-    "Registra uma informação que o cliente forneceu (email, nome ou telefone) como PROPOSTA para " +
-    "uma pessoa confirmar. NADA é gravado no cadastro por conta desta chamada, e a proposta vence " +
-    "sozinha se ninguém decidir. Nunca diga ao cliente que o cadastro foi atualizado. Recusa se já " +
-    "houver proposta do mesmo campo aguardando decisão, se o valor for igual ao que já está " +
-    "gravado, ou se o contato foi anonimizado.",
+    "Registra uma informação que o cliente forneceu. EMAIL é gravado direto no cadastro (a " +
+    "resposta traz `gravado: true`). NOME e TELEFONE viram PROPOSTA para uma pessoa confirmar: " +
+    "nada é gravado por conta desta chamada, e a proposta vence sozinha se ninguém decidir. Nunca " +
+    "diga ao cliente que o cadastro foi atualizado. Recusa se já houver proposta do mesmo campo " +
+    "aguardando decisão, se o valor for igual ao que já está gravado, ou se o contato foi anonimizado.",
   inputSchema: propostaShape,
   category: "write",
   requiresRole: "agent",
   requiresScope: "mcp:write",
   handler: async (input, ctx) => {
+    // E-mail vai direto para o cadastro (decisão desta instalação; o porquê em
+    // `email-do-contato.ts`). Se não der para gravar — e-mail já usado por outro
+    // contato, por exemplo — cai no caminho da proposta, que uma pessoa resolve.
+    if (input.campo === "email") {
+      const gravacao = await gravarEmailDoContato(ctx, input.contact_id, input.valor);
+      if (gravacao.gravado) return { gravado: true, campo: "email" };
+    }
+
     const r = await proporDadoDoContato(ctx.supabase, {
       organizationId: ctx.organizationId,
       contactId: input.contact_id,
