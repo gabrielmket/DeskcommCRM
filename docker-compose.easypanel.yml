@@ -37,9 +37,10 @@ services:
 
   app:
     mem_limit: 768m
-    # Versão NUMERADA, nunca `latest` (topo da main do autor). Para rodar um
-    # build próprio do fork: APP_IMAGE=ghcr.io/gabrielmket/deskcommcrm:<tag>.
-    image: ${APP_IMAGE:-ghcr.io/melgarafael/deskcommcrm:1.21.0}
+    # Versão NUMERADA do build deste fork (tag git vX.Y.Z-tc.N → publish-image.yml),
+    # nunca `latest`/`main`: pull_policy é `missing`, então tag móvel não seria
+    # puxada de novo. Voltar ao autor: ghcr.io/melgarafael/deskcommcrm:1.21.0.
+    image: ${APP_IMAGE:-ghcr.io/gabrielmket/deskcommcrm:1.21.0-tc.1}
     pull_policy: missing
     restart: unless-stopped
     env_file: .env
@@ -60,7 +61,7 @@ services:
 
   worker:
     mem_limit: 512m
-    image: ${WORKER_IMAGE:-ghcr.io/melgarafael/deskcomm-worker:1.21.0}
+    image: ${WORKER_IMAGE:-ghcr.io/gabrielmket/deskcomm-worker:1.21.0-tc.1}
     pull_policy: missing
     restart: unless-stopped
     env_file: .env
@@ -129,7 +130,7 @@ services:
     logging: *default-logging
 
   scheduler:
-    image: ${SCHEDULER_IMAGE:-ghcr.io/melgarafael/deskcomm-scheduler:1.21.0}
+    image: ${SCHEDULER_IMAGE:-ghcr.io/gabrielmket/deskcomm-scheduler:1.21.0-tc.1}
     pull_policy: missing
     restart: unless-stopped
     depends_on:
