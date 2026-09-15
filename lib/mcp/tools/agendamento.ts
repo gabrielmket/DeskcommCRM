@@ -224,7 +224,17 @@ export const crmFindFreeSlots: McpToolDefinition<typeof horariosLivresShape> = {
     // Dia que não é data de verdade ("0000-00-00", "0001-01-01", ambos medidos no
     // mesmo turno) passa pela regex mas não é pedido de ninguém: é descartado e a
     // consulta cai no período relativo, que é o caminho padrão.
-    const dia = input.dia !== undefined && diaCivilValido(input.dia) ? input.dia : undefined;
+    const diaInvalido = input.dia !== undefined && !diaCivilValido(input.dia);
+    // Dia inválido SOZINHO não pode virar "próximos 14 dias" em silêncio: o
+    // modelo ofereceria horários de outros dias como se fossem do dia pedido.
+    if (diaInvalido && input.dias_a_frente === undefined) {
+      return {
+        horarios: [],
+        motivo: "dia_invalido",
+        mensagem: `"${input.dia}" não é uma data válida. Informe o dia em AAAA-MM-DD ou use dias_a_frente.`,
+      };
+    }
+    const dia = diaInvalido ? undefined : input.dia;
     const diasAFrente = dia === undefined ? input.dias_a_frente : undefined;
 
     // A faixa larga contém o dia civil em QUALQUER fuso. Depois de a coleta
@@ -286,6 +296,9 @@ export const crmFindFreeSlots: McpToolDefinition<typeof horariosLivresShape> = {
       // evitar.
       total_de_horarios: slotsDoPeriodo.length,
       ha_mais: slotsDoPeriodo.length > escolhidos.length,
+      // Avisa que a data mandada foi descartada e a lista é do período: sem isto
+      // o modelo apresentaria os horários como se fossem do dia que ele pediu.
+      ...(diaInvalido ? { dia_ignorado: input.dia, periodo_consultado_em_dias: diasAFrente } : {}),
       fuso_da_regra: consulta.fusoDaRegra,
       /** false = o atendente NÃO publicou jornada. Diferente de "sem vaga" (DECISÃO 1.1). */
       publicou_horarios: consulta.publicouHorarios,
@@ -492,10 +505,11 @@ export const crmBookAppointment: McpToolDefinition<typeof marcarShape> = {
           ...(input.guest_email ? { guest_email: input.guest_email } : {}),
         },
       );
-      // O e-mail do convite também vai para o cadastro do contato; falhar aqui
-      // não desfaz a reunião, que já está marcada.
+      // O e-mail do convite vai para o cadastro SÓ se o contato ainda não tem
+      // e-mail: o convidado pode ser outra pessoa (secretária, sócio) e não
+      // sobrescreve o do cliente. Falhar aqui não desfaz a reunião.
       const emailNoCadastro = input.guest_email
-        ? (await gravarEmailDoContato(ctx, input.contact_id, input.guest_email)).gravado
+        ? (await gravarEmailDoContato(ctx, input.contact_id, input.guest_email, { soSeVazio: true })).gravado
         : undefined;
       return {
         marcado: true,

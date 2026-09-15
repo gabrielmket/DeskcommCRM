@@ -155,6 +155,16 @@ describe("crm_find_free_slots", () => {
     expect(params.ate.toISOString()).toBe("2026-09-14T14:00:00.000Z");
   });
 
+  it("dia inválido SOZINHO é recusado com ensino — não vira 14 dias em silêncio", async () => {
+    const r = (await crmFindFreeSlots.handler({ event_type_slug: "c", dia: "2026-09-31" }, ctx)) as {
+      motivo: string;
+      mensagem: string;
+    };
+    expect(r.motivo).toBe("dia_invalido");
+    expect(r.mensagem).toMatch(/AAAA-MM-DD|dias_a_frente/);
+    expect(horariosLivresDaOrg).not.toHaveBeenCalled();
+  });
+
   it("dia que não é data de verdade (0000-00-00) é ignorado e vale o período", async () => {
     respondeCom(SUCESSO);
     await crmFindFreeSlots.handler({ event_type_slug: "c", dia: "0000-00-00", dias_a_frente: 3 }, ctx);

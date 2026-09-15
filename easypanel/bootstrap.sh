@@ -64,9 +64,20 @@ SQL
 log "extensões ok (vector, citext, pg_trgm)"
 
 # ── 2. Schema ───────────────────────────────────────────────────────────────
-tem_schema="$(psql "$DB" -tAc "select 1 from information_schema.tables where table_schema='public' and table_name='organizations' limit 1" | tr -d '[:space:]')"
-if [ "$tem_schema" = "1" ]; then
-  log "schema já existe: re-aplicando em modo update"
+# Quantas tabelas o `public` já tem. A leitura NÃO pode esconder falha: com
+# `psql | tr` o `sh` só vê o status do `tr`, e uma queda do pooler aqui virava
+# "banco novo" — o baseline rodava com ON_ERROR_STOP por cima de um banco
+# existente, morria no primeiro "already exists" e o app nunca subia.
+# Qualquer tabela no `public` (e não só `organizations`) conta como banco
+# existente: uma primeira instalação que caiu no meio do baseline precisa do
+# modo update para terminar, não de outra tentativa que para no mesmo lugar.
+if ! existentes="$(psql "$DB" -tAc "select count(*) from information_schema.tables where table_schema='public'" 2>&1)"; then
+  printf '%s\n' "$existentes" | head -3 >&2
+  falha "não consegui ler o estado do banco (a conexão caiu?). Nada foi alterado; reimplante."
+fi
+existentes="$(printf '%s' "$existentes" | tr -d '[:space:]')"
+if [ "${existentes:-0}" -gt 0 ]; then
+  log "banco já tem ${existentes} tabelas: re-aplicando o schema em modo update"
   psql "$DB" -q -f "$BASELINE" > /tmp/baseline.log 2>&1 || true
   inesperados="$(grep -iE 'ERROR|FATAL' /tmp/baseline.log | grep -viE "$BENIGNOS" || true)"
   if [ -n "$inesperados" ]; then
@@ -98,6 +109,26 @@ log "chave de cifra ativa no banco"
 # ── 4. Dono ─────────────────────────────────────────────────────────────────
 if [ -z "${OWNER_EMAIL:-}" ] || [ -z "${OWNER_PASSWORD:-}" ]; then
   log "OWNER_EMAIL/OWNER_PASSWORD vazios: pulei a criação do dono"
+  log "pronto"
+  exit 0
+fi
+
+# Dono já configurado (tem vínculo com alguma organização, ativo OU revogado):
+# não re-promove. Sem esta trava, todo deploy com OWNER_EMAIL/OWNER_PASSWORD no
+# Environment devolvia ao dono o papel de admin e o acesso de plataforma que
+# alguém tivesse revogado pela tela.
+if ! ja_configurado="$(psql "$DB" -tA -v email="$OWNER_EMAIL" 2>&1 <<'SQL'
+select 1 from public.user_organizations uo
+  join auth.users u on u.id = uo.user_id
+ where lower(u.email) = lower(:'email')
+ limit 1;
+SQL
+)"; then
+  printf '%s\n' "$ja_configurado" | head -3 >&2
+  falha "não consegui verificar se o dono já está configurado"
+fi
+if [ "$(printf '%s' "$ja_configurado" | tr -d '[:space:]')" = "1" ]; then
+  log "dono já está configurado: não re-promovo (revogações feitas pela tela continuam valendo)"
   log "pronto"
   exit 0
 fi
