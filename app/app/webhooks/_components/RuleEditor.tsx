@@ -69,6 +69,15 @@ const MESSAGE_FIELDS: CuratedField[] = [
   { value: "event.body_preview", label: "Texto da mensagem", op: "contains" },
   { value: "contact.tags", label: "Tags do contato", op: "contains" },
 ];
+/**
+ * O tipo do compromisso é o filtro que importa aqui: uma casa que usa a agenda
+ * para reunião comercial E para retorno de atendimento não quer o mesmo aviso
+ * para os dois.
+ */
+const AGENDAMENTO_FIELDS: CuratedField[] = [
+  { value: "event.nome_do_tipo", label: "Tipo de compromisso", op: "eq" },
+  { value: "contact.tags", label: "Tags do contato", op: "contains" },
+];
 const TAG_ADDED_FIELD: CuratedField = {
   value: "event.added_tags",
   label: "Tag adicionada",
@@ -84,6 +93,7 @@ const CURATED_FIELDS: Record<TriggerEvent, CuratedField[]> = {
   "message.received": MESSAGE_FIELDS,
   "lead.tag_added": [...LEAD_FIELDS, TAG_ADDED_FIELD],
   "contact.tag_added": [TAG_ADDED_FIELD],
+  "appointment.booked": AGENDAMENTO_FIELDS,
 };
 
 const OP_LABELS: Record<Op, string> = { eq: "é", neq: "não é", contains: "contém" };

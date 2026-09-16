@@ -12,7 +12,8 @@ export type ActionType =
   | "add_tag"
   | "assign_owner"
   | "call_webhook"
-  | "start_message_flow";
+  | "start_message_flow"
+  | "notify_group";
 
 export const TRIGGER_LABELS: Record<TriggerEvent, string> = {
   "lead.created": "Quando entrar um contato novo (webhook)",
@@ -20,6 +21,7 @@ export const TRIGGER_LABELS: Record<TriggerEvent, string> = {
   "message.received": "Quando chegar mensagem no WhatsApp",
   "lead.tag_added": "Quando um lead ganhar uma tag",
   "contact.tag_added": "Quando um contato ganhar uma tag",
+  "appointment.booked": "Quando uma reunião for marcada",
 };
 
 export const ACTION_LABELS: Record<ActionType, string> = {
@@ -30,4 +32,5 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   assign_owner: "Atribuir a um atendente",
   call_webhook: "Avisar outro sistema (webhook)",
   start_message_flow: "Iniciar fluxo de mensagem",
+  notify_group: "Avisar o time num grupo do WhatsApp",
 };

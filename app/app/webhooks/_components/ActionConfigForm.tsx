@@ -32,7 +32,11 @@ export type ActionItem =
   | { type: "add_tag"; config: { tags: string[] } }
   | { type: "assign_owner"; config: { user_id: string } }
   | { type: "call_webhook"; config: { url: string; secret?: string; secret_enc?: string } }
-  | { type: "start_message_flow"; config: { flow_pointer_id: string } };
+  | { type: "start_message_flow"; config: { flow_pointer_id: string } }
+  | {
+      type: "notify_group";
+      config: { channel_session_id: string; chat_id: string; template: string };
+    };
 
 export function defaultActionConfig(type: ActionItem["type"]): ActionItem {
   switch (type) {
@@ -50,6 +54,8 @@ export function defaultActionConfig(type: ActionItem["type"]): ActionItem {
       return { type, config: { url: "" } };
     case "start_message_flow":
       return { type, config: { flow_pointer_id: "" } };
+    case "notify_group":
+      return { type, config: { channel_session_id: "", chat_id: "", template: "" } };
   }
 }
 
@@ -422,6 +428,127 @@ function StartMessageFlowForm({ config, onChange }: FormProps<{ flow_pointer_id:
   );
 }
 
+/**
+ * Variáveis do aviso interno. São OUTRAS que as da mensagem ao cliente: aqui
+ * quem lê é o time, e o que ele precisa saber é quando é a reunião e o que a IA
+ * apurou — não "Oi {{nome}}".
+ */
+const VARS_DO_AVISO = [
+  { token: "{{contact.display_name}}", label: "Nome do contato" },
+  { token: "{{contact.phone_number}}", label: "Telefone" },
+  { token: "{{agendamento.starts_at}}", label: "Quando é" },
+  { token: "{{agendamento.notes}}", label: "Resumo da qualificação" },
+  { token: "{{event.nome_do_tipo}}", label: "Tipo de compromisso" },
+];
+
+/**
+ * "Avisar o time num grupo do WhatsApp".
+ *
+ * O id do grupo é DIGITADO e não escolhido: o sistema não mantém catálogo de
+ * grupos (ele só conhece os que já lhe mandaram mensagem), e o grupo do
+ * comercial costuma ser mais antigo que a conexão. A tela diz onde achar o id
+ * em vez de fingir uma lista que ficaria vazia justamente para quem mais
+ * precisa dela.
+ */
+function NotifyGroupForm({
+  config,
+  onChange,
+}: FormProps<{ channel_session_id: string; chat_id: string; template: string }>) {
+  const t = useT();
+  const { data: sessions } = useChannelSessions();
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const grupoSuspeito = config.chat_id.trim().length > 0 && !/@g\.us$/i.test(config.chat_id.trim());
+
+  const insertVar = (token: string) => {
+    const el = textareaRef.current;
+    const current = config.template;
+    const start = el?.selectionStart ?? current.length;
+    const end = el?.selectionEnd ?? current.length;
+    const next = current.slice(0, start) + token + current.slice(end);
+    onChange({ ...config, template: next });
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + token.length, start + token.length);
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="space-y-1">
+        <Label>{t("Número de WhatsApp")}</Label>
+        <Select
+          value={config.channel_session_id}
+          onValueChange={(v) => onChange({ ...config, channel_session_id: v })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={t("Escolha o número")} />
+          </SelectTrigger>
+          <SelectContent>
+            {(sessions ?? []).map((s) => (
+              <SelectItem key={s.id} value={s.id} disabled={s.status !== "WORKING"}>
+                {channelLabel(s) + (s.status !== "WORKING" ? " — desconectado" : "")}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {t("Precisa ser um número conectado por QR Code — a API oficial da Meta não envia para grupo.")}
+        </p>
+      </div>
+      <div className="space-y-1">
+        <Label>{t("Id do grupo")}</Label>
+        <Input
+          value={config.chat_id}
+          onChange={(e) => onChange({ ...config, chat_id: e.target.value })}
+          placeholder="1203634...@g.us"
+        />
+        {grupoSuspeito ? (
+          <p className="text-xs text-error-fg">
+            {/* Recusar aqui, e não só no envio: o erro fácil é colar o telefone
+                de alguém, e aí o aviso interno — com resumo e valor — sai para
+                um CLIENTE. */}
+            {t("Id de grupo termina em @g.us. Um número de pessoa aqui manda o aviso interno para o cliente.")}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {t("O id aparece na conversa do grupo, na tela de Conexões, assim que ele mandar a primeira mensagem para este número.")}
+          </p>
+        )}
+      </div>
+      <div className="space-y-1">
+        <Label>{t("Aviso")}</Label>
+        <div className="flex flex-wrap gap-1">
+          {VARS_DO_AVISO.map((v) => (
+            <Button
+              key={v.token}
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => insertVar(v.token)}
+            >
+              {v.label}
+            </Button>
+          ))}
+        </div>
+        <Textarea
+          ref={textareaRef}
+          rows={4}
+          value={config.template}
+          onChange={(e) => onChange({ ...config, template: e.target.value })}
+          placeholder={t("Reunião marcada com {{contact.display_name}} — {{agendamento.starts_at}}")}
+        />
+        <p className="text-xs text-muted-foreground">
+          {/* O aviso interno NÃO passa pela janela nem pelo limite diário do
+              número: do outro lado está o time, não um cliente que pode marcar
+              como spam. Dizer isso aqui evita a pergunta "por que este chegou
+              de madrugada e o outro não". */}
+          {t("Aviso interno: sai na hora, sem esperar a janela de envio nem contar no limite diário do número.")}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function ActionConfigForm({
   action,
   onChange,
@@ -475,6 +602,13 @@ export function ActionConfigForm({
     case "start_message_flow":
       return (
         <StartMessageFlowForm
+          config={action.config}
+          onChange={(config) => onChange({ type: action.type, config })}
+        />
+      );
+    case "notify_group":
+      return (
+        <NotifyGroupForm
           config={action.config}
           onChange={(config) => onChange({ type: action.type, config })}
         />

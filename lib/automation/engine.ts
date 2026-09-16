@@ -30,6 +30,7 @@ const EXPECTED_ENTITY_KIND: Record<string, string> = {
   "lead.tag_added": "crm_lead",
   "contact.tag_added": "contact",
   "message.received": "message",
+  "appointment.booked": "calendar_appointment",
 };
 
 interface RuleRow {
@@ -72,6 +73,40 @@ export async function buildContext(admin: SupabaseClient, row: EventRow): Promis
       .eq("organization_id", org)
       .maybeSingle();
     if (contact) context.contact = contact;
+  } else if (row.entity_kind === "calendar_appointment" && row.entity_id) {
+    // O evento carrega só os ids; o resto vem daqui, como em lead.created. O
+    // que o operador escreve no aviso ({{agendamento.notes}}, a hora, o nome do
+    // contato) precisa estar no contexto, senão o template renderiza vazio e o
+    // time recebe um aviso sem o que ele foi criado para dizer.
+    const { data: agendamento } = await admin
+      .from("calendar_appointments")
+      .select("*")
+      .eq("id", row.entity_id)
+      .eq("organization_id", org)
+      .maybeSingle();
+    if (agendamento) context.agendamento = agendamento;
+    const contactId = (row.payload.contact_id as string | null) ?? null;
+    if (contactId) {
+      const { data: contact } = await admin
+        .from("contacts")
+        .select("*")
+        .eq("id", contactId)
+        .eq("organization_id", org)
+        .maybeSingle();
+      if (contact) context.contact = contact;
+    }
+    // O lead entra quando JÁ existe. Quando não existe, a ausência é o sinal
+    // que a ação `create_or_move_lead` lê para criar o card em vez de mover.
+    const leadId = (row.payload.lead_id as string | null) ?? null;
+    if (leadId) {
+      const { data: lead } = await admin
+        .from("crm_leads")
+        .select("*")
+        .eq("id", leadId)
+        .eq("organization_id", org)
+        .maybeSingle();
+      if (lead) context.lead = lead;
+    }
   } else if (row.entity_kind === "message" && row.entity_id) {
     const contactId = row.payload.contact_id as string | undefined;
     if (contactId) {

@@ -1,6 +1,6 @@
 /**
  * Zod schemas for webhook-sources e automation-rules (feature Webhooks, Task 12).
- * TRIGGER_EVENTS deve espelhar exatamente os 5 eventos que o motor
+ * TRIGGER_EVENTS deve espelhar exatamente os eventos que o motor
  * (`lib/automation/engine.ts` → EXPECTED_ENTITY_KIND) reconhece.
  */
 import { z } from "zod";
@@ -11,6 +11,7 @@ export const TRIGGER_EVENTS = [
   "message.received",
   "lead.tag_added",
   "contact.tag_added",
+  "appointment.booked",
 ] as const;
 
 export const conditionSchema = z.object({
@@ -51,6 +52,20 @@ export const actionSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("start_message_flow"),
     config: z.object({ flow_pointer_id: z.string().uuid() }),
+  }),
+  z.object({
+    type: z.literal("notify_group"),
+    config: z.object({
+      channel_session_id: z.string().uuid(),
+      /**
+       * O id do grupo no WhatsApp (`...@g.us`). É digitado, e não escolhido de
+       * uma lista, porque o sistema não guarda catálogo de grupos: ele só
+       * conhece os que já lhe mandaram mensagem, e o grupo do comercial pode
+       * ser mais antigo que a conexão.
+       */
+      chat_id: z.string().min(6).max(120),
+      template: z.string().min(1).max(2000),
+    }),
   }),
 ]);
 

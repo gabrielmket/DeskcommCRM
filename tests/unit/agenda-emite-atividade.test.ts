@@ -225,6 +225,13 @@ function atividades(): Linha[] {
   return banco.inserido["crm_lead_activities"] ?? [];
 }
 
+/** Os anúncios de "marcaram reunião" que chegaram ao `event_log`. */
+function reunioesAnunciadas(): Array<{ fn: string; args: Linha }> {
+  return banco.rpc.filter(
+    (c) => c.fn === "emit_event" && c.args.p_event_type === "appointment.booked",
+  );
+}
+
 /** Os avisos de rastro perdido que chegaram ao `event_log`. */
 function avisosDeRastroPerdido(): Array<{ fn: string; args: Linha }> {
   return banco.rpc.filter(
@@ -447,6 +454,69 @@ describe("quando a gravação da timeline falha", () => {
     expect(
       avisosDeRastroPerdido(),
       "o handler passou a contar a falha de escrita da timeline (o que é o comportamento CERTO): troque este caso para exigir 1 aviso — a dívida foi paga",
+    ).toHaveLength(0);
+  });
+});
+
+/**
+ * O QUARTO EMISSOR: o anúncio de reunião marcada.
+ *
+ * Ele existe para a automação — card no funil comercial e aviso no grupo do
+ * time — e por isso ele sai onde os outros três NÃO saem: antes de saber se há
+ * negócio. Reunião marcada com contato que ainda não virou card é justamente o
+ * caso em que a automação tem trabalho; um emissor que só falasse com negócio
+ * aberto ficaria mudo exatamente ali.
+ */
+describe("a agenda anuncia a reunião marcada", () => {
+  it("marcar anuncia `appointment.booked` com o contato e o negócio", async () => {
+    await marcarAgendamentoHandler(cliente(), ctx, {
+      event_type_id: TIPO,
+      starts_at: HORARIO,
+      contact_id: CONTATO,
+    });
+
+    const anuncios = reunioesAnunciadas();
+    expect(
+      anuncios,
+      "ninguém foi avisado da reunião: o card não nasce no comercial e o grupo do time não recebe nada — o vendedor descobre a reunião quando o cliente entra na sala",
+    ).toHaveLength(1);
+    const args = anuncios[0]!.args;
+    expect(args.p_entity_kind, "o motor de automação filtra por entity_kind: outro valor faz a regra nunca casar").toBe(
+      "calendar_appointment",
+    );
+    expect(args.p_entity_id, "sem o id do compromisso o aviso não tem como dizer QUANDO é a reunião").toBe(AGENDAMENTO);
+    const payload = args.p_payload as Linha;
+    expect(payload.contact_id, "sem o contato a automação não tem de quem criar o card").toBe(CONTATO);
+    expect(payload.lead_id, "o negócio aberto do contato tem que viajar junto: sem ele a automação cria um card DUPLICADO em vez de mover o que já existe").toBe(NEGOCIO);
+    expect(payload.nome_do_tipo, "é por ele que a regra separa reunião comercial de retorno de atendimento").toBe("Consulta");
+  });
+
+  it("SEM negócio aberto o anúncio sai mesmo assim — é o caso que a automação existe para resolver", async () => {
+    banco.negocios = [];
+
+    await marcarAgendamentoHandler(cliente(), ctx, {
+      event_type_id: TIPO,
+      starts_at: HORARIO,
+      contact_id: CONTATO,
+    });
+
+    const anuncios = reunioesAnunciadas();
+    expect(
+      anuncios,
+      "o anúncio ficou preso ao negócio: contato novo que marcou reunião não vira card nenhum, e a automação só serviria para quem já era cliente",
+    ).toHaveLength(1);
+    expect(
+      (anuncios[0]!.args.p_payload as Linha).lead_id,
+      "lead_id tem que vir NULO (e não inventado): é a ausência dele que a ação lê para CRIAR o card em vez de mover",
+    ).toBeNull();
+  });
+
+  it("cancelar NÃO anuncia reunião marcada — o par que prova que a sonda não carimba tudo", async () => {
+    await cancelarAgendamentoHandler(cliente(), ctx, { id: AGENDAMENTO, reason: "cliente pediu" });
+
+    expect(
+      reunioesAnunciadas(),
+      "cancelamento saiu como reunião marcada: o time recebe aviso de reunião que não existe e o card anda para a etapa errada",
     ).toHaveLength(0);
   });
 });

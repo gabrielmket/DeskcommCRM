@@ -27,10 +27,15 @@ import { horariosLivresDaOrg } from "@/lib/agenda/consulta";
 import {
   atividadeDaTransicao,
   autorParaTimeline,
+  avisaReuniaoMarcada,
   type SituacaoAnterior,
   type Transicao,
 } from "@/lib/agenda/laco";
-import { ALVO_DE_VINCULO_DO_AGENDAMENTO, VINCULO_DE_AGENDAMENTO } from "@/lib/agenda/tipos";
+import {
+  ALVO_DE_VINCULO_DO_AGENDAMENTO,
+  VINCULO_DE_AGENDAMENTO,
+  type AtividadeDaAgenda,
+} from "@/lib/agenda/tipos";
 import { ApiError } from "@/lib/api/types";
 import type { Actor, HandlerCtx } from "@/lib/api/handlers/types";
 import { audit } from "@/lib/audit";
@@ -525,7 +530,10 @@ async function fecharOLaco(
   args: {
     appointmentId: string;
     contactId: string | null;
-    atividade: string | null;
+    // `AtividadeDaAgenda` e não `string`: o tipo é o que impede um literal
+    // datilografado errado (o erro silencioso desta feature — ver laco.ts) de
+    // virar uma frase inexistente na timeline.
+    atividade: AtividadeDaAgenda | null;
     transicao: Transicao;
     fusoDoCompromisso: string;
     nomeDoTipo: string;
@@ -554,6 +562,37 @@ async function fecharOLaco(
         error: err instanceof Error ? err.message : String(err),
       });
     });
+  }
+
+  // ⚠️ ANTES dos dois early-returns abaixo. Reunião marcada para contato que
+  // ainda NÃO tem negócio aberto é exatamente o caso que a automação existe
+  // para resolver (ela cria o card); emitir só quando já há lead deixaria de
+  // fora o único cenário em que o aviso muda alguma coisa.
+  if (avisaReuniaoMarcada(args.atividade)) {
+    // Pelo client que já veio, como `registraFalhaDeAtividade` faz três
+    // linhas abaixo: `emit_event` é `security definer` e está concedida a
+    // `authenticated`. Abrir um client de service-role só para isto daria ao
+    // caminho da rota um poder que ele não precisa ter.
+    await supabase
+      .rpc("emit_event", {
+        p_event_type: "appointment.booked",
+        p_entity_kind: "calendar_appointment",
+        p_entity_id: args.appointmentId,
+        p_payload: {
+          contact_id: args.contactId,
+          lead_id: leadId,
+          nome_do_tipo: args.nomeDoTipo,
+          fuso: args.fusoDoCompromisso,
+        },
+        p_metadata: { request_id: ctx.requestId },
+        p_organization_id: ctx.organization_id,
+      })
+      .then(({ error }) => {
+        // Fire-and-forget quanto a erro: o compromisso JÁ está marcado, e
+        // derrubar a marcação porque o aviso falhou trocaria um problema de
+        // comunicação por um de agenda.
+        if (error) logger.error("[agenda] emit_event appointment.booked falhou", { error: error.message });
+      });
   }
 
   if (!args.atividade) return;
