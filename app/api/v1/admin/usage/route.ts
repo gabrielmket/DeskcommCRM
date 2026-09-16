@@ -63,6 +63,16 @@ export interface UsageData {
    * do sistema não. Ver `lib/ai/custo/natureza.ts`.
    */
   natureza: GastoSeparado;
+  /**
+   * O que a OpenAI COBROU no período, dias fechados (`platform_openai_spend`,
+   * preenchida pelo cron `gasto-openai`). Nulo quando não há chave de
+   * administração ou nenhum dia capturado — e aí a tela não finge ter a fatura.
+   *
+   * A diferença entre isto e `natureza.totalCents` é a margem de erro da nossa
+   * medição: é ela que diz se dá para confiar no custo por conversa na hora de
+   * fechar preço.
+   */
+  fatura: { total_usd: number; dias: number; ate: string | null } | null;
   /** Cotação de mercado mais recente — a tela diz de quando ela é. */
   cotacao: { usd_brl: number; cotado_em: string | null } | null;
   /**
@@ -356,6 +366,25 @@ export async function GET(req: NextRequest) {
     usd_brl: Number(r.usd_brl),
   }));
 
+  // A fatura só tem dias FECHADOS: o período pedido pode incluir hoje, e o
+  // total abaixo declara quantos dias ele cobre em vez de fingir cobrir tudo.
+  const { data: faturaRows } = await admin
+    .from("platform_openai_spend")
+    .select("dia, usd")
+    .gte("dia", startIso.slice(0, 10))
+    .order("dia", { ascending: false })
+    .limit(400);
+  const fatura =
+    faturaRows && faturaRows.length > 0
+      ? {
+          total_usd: Number(
+            faturaRows.reduce((acc, f) => acc + Number(f.usd ?? 0), 0).toFixed(4),
+          ),
+          dias: faturaRows.length,
+          ate: (faturaRows[0]?.dia as string | undefined) ?? null,
+        }
+      : null;
+
   const custosPorDia = dateLabels.map((date) => ({ dia: date, cents: aiCostDayMap.get(date) ?? 0 }));
   const { reais: totalReais, semCotacao } = totalEmReais(custosPorDia, historico);
 
@@ -376,6 +405,7 @@ export async function GET(req: NextRequest) {
       tenants,
       series,
       natureza,
+      fatura,
       cotacao,
       reais: {
         total: totalReais,

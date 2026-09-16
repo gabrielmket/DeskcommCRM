@@ -160,7 +160,7 @@ export function TenantOverview({ organization, counts, integrations }: TenantOve
                 value={formatDate(integrations.nuvemshop_connected_at, tagDoIdioma)}
               />
             )}
-            <InfoRow label="Sessões MiaZap" value={counts.waha_sessions_count} />
+            <InfoRow label={t("Sessões MiaZap")} value={counts.waha_sessions_count} />
           </div>
         </div>
 

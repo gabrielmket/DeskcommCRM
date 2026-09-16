@@ -53,7 +53,9 @@ const PUBLICA = fs.readFileSync(path.join(RAIZ, ".github/workflows/publish-image
 const ENV_EXEMPLO = fs.readFileSync(path.join(RAIZ, ".env.hostgator.example"), "utf8");
 
 /** O valor literal que este repositório publica. A âncora. */
-const NAMESPACE_DESTE_REPO = "ghcr.io/melgarafael";
+// FORK: este repositório publica as imagens da MIA. A âncora acompanha o
+// namespace real — é exatamente o que o RECADO_AO_FORK abaixo manda fazer.
+const NAMESPACE_DESTE_REPO = "ghcr.io/gabrielmket";
 
 /**
  * Um fork que publica as próprias imagens muda `IMG_NS` — e precisa mudar junto
@@ -160,7 +162,7 @@ describe("o default do compose diz o mesmo que o kit", () => {
 
 describe("o kit aponta para o que o CI realmente publica", () => {
   it("os defaults de código e os labels de origem apontam para este repositório", () => {
-    const repo = "https://github.com/melgarafael/DeskcommCRM";
+    const repo = "https://github.com/gabrielmket/mia";
     for (const script of ["install.sh", "comecar.sh"]) {
       const texto = fs.readFileSync(path.join(RAIZ, "hostgator-setup-kit", script), "utf8");
       expect(texto).toContain(`REPO_URL="\${REPO_URL:-${repo}.git}"`);
@@ -198,7 +200,7 @@ describe("o kit aponta para o que o CI realmente publica", () => {
         log=$(mktemp)
         trap 'rm -f "$log"' EXIT
         # O dublê registra em arquivo porque a função captura stdout do curl.
-        ghcr_status deskcommcrm 1.2.3
+        ghcr_status mia-crm 1.2.3
         printf '\\n'
         cat "$log"
       `,
@@ -209,8 +211,8 @@ describe("o kit aponta para o que o CI realmente publica", () => {
       );
       expect(saida.trim().split("\n")).toEqual([
         "200",
-        `https://${registry}/token?scope=repository:${owner}/deskcommcrm:pull&service=${registry}`,
-        `https://${registry}/v2/${owner}/deskcommcrm/manifests/1.2.3`,
+        `https://${registry}/token?scope=repository:${owner}/mia-crm:pull&service=${registry}`,
+        `https://${registry}/v2/${owner}/mia-crm/manifests/1.2.3`,
       ]);
     },
   );
@@ -254,6 +256,12 @@ describe("catraca: ninguém mais repete o namespace", () => {
     "docker-compose.prod.yml",
     ".env.hostgator.example",
     "tests/unit/namespace-das-imagens.test.ts",
+    // O compose do EasyPanel é a QUARTA declaração independente desta
+    // instalação — é o arquivo que a VPS da MIA lê, e ele não tem de onde
+    // derivar (o `_common.sh` é do instalador por terminal, que o EasyPanel não
+    // usa). Entra aqui pelo mesmo motivo dos outros três: declaração que não
+    // tem fonte, e não repetição descuidada.
+    "docker-compose.easypanel.yml",
   ]);
 
   /**

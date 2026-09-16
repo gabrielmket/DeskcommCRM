@@ -20,6 +20,11 @@ import type { GastoSeparado } from "@/lib/ai/custo/natureza";
 interface Props {
   natureza: GastoSeparado;
   cotacao: { usd_brl: number; cotado_em: string | null } | null;
+  /**
+   * O que a OpenAI COBROU nos dias já fechados do período. Nulo = sem chave de
+   * administração ou sem dia capturado, e aí a tela não finge ter a fatura.
+   */
+  fatura: { total_usd: number; dias: number; ate: string | null } | null;
   /** Já convertido no servidor, dia a dia pela cotação daquele dia. */
   reais: {
     total: number;
@@ -27,6 +32,19 @@ interface Props {
     taxa_efetiva: number | null;
     total_pela_taxa_efetiva: number | null;
   };
+}
+
+/**
+ * Quanto a nossa medição se afasta da fatura, em porcento e sem sinal — a
+ * direção não importa para decidir se dá para confiar nela; o TAMANHO importa.
+ */
+function diferencaEmPorcento(medidoEmCents: number, faturaUsd: number): number {
+  return Math.abs(Math.round(((medidoEmCents / 100 - faturaUsd) / faturaUsd) * 100));
+}
+
+/** A fatura vem em DÓLAR inteiro, não em centavo como `llm_calls.cost_cents`. */
+function usdSimples(valor: number, tag: string): string {
+  return valor.toLocaleString(tag, { style: "currency", currency: "USD" });
 }
 
 function emReais(cents: number, usdBrl: number, tag: string): string {
@@ -61,7 +79,7 @@ function Cartao({
   );
 }
 
-export function NaturezaDoGasto({ natureza, cotacao, reais }: Props) {
+export function NaturezaDoGasto({ natureza, cotacao, reais, fatura }: Props) {
   const t = useT();
   const tagDoIdioma = useTagDeIdioma();
   const { atendimentoCents, sistemaCents, totalCents, conversas, porConversaCents, semPreco } = natureza;
@@ -151,6 +169,23 @@ export function NaturezaDoGasto({ natureza, cotacao, reais }: Props) {
           <> {" · "}{reais.dias_sem_cotacao} {t("dia(s) sem cotação, total parcial")}</>
         ) : null}
       </p>
+
+      {/* A FATURA ao lado da nossa conta. A diferença entre as duas é a margem
+          de erro da medição — e é ela que diz se dá para confiar no custo por
+          conversa na hora de fechar preço com um cliente. */}
+      {fatura ? (
+        <p className="text-xs text-muted-foreground">
+          {t("A OpenAI cobrou")}{" "}
+          <span className="font-medium text-foreground">
+            {usdSimples(fatura.total_usd, tagDoIdioma)}
+          </span>{" "}
+          {t("nos")} {fatura.dias} {t("dia(s) já fechados")} · {t("medimos")}{" "}
+          {formatCentsUSD(totalCents)}
+          {fatura.total_usd > 0
+            ? ` · ${t("diferença de")} ${diferencaEmPorcento(totalCents, fatura.total_usd)}%`
+            : ""}
+        </p>
+      ) : null}
 
       {semPreco > 0 ? (
         // A ressalva que impede ler um piso como se fosse a conta inteira.

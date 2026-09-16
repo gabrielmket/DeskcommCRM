@@ -92,7 +92,13 @@ describe("o destino 'Uso e orçamento' é da plataforma", () => {
   });
 
   it("a marca não vazou para outros destinos: o resto do menu segue por papel", () => {
+    // Os DOIS destinos de plataforma, e o motivo de cada um:
+    //  · uso e orçamento — dinheiro da IA é de quem paga o provedor;
+    //  · credenciais — a chave do provedor é do mesmo dono do dinheiro. Deixá-la
+    //    com o cliente permitiria apontar para outra conta, ou apagar e derrubar
+    //    o atendimento.
+    // Número de WhatsApp e agenda do Google seguem sendo do cliente, no painel dele.
     const marcados = catalogo.filter((d) => d.somentePlataforma === true).map((d) => d.href);
-    expect(marcados).toEqual(["/app/ai/usage"]);
+    expect(marcados.sort()).toEqual(["/app/ai/credentials", "/app/ai/usage"]);
   });
 });

@@ -3,7 +3,7 @@ import { NavHub } from "@/components/shell/NavHub";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Agente de IA" };
+export const metadata: Metadata = { title: "Agente MIA" };
 
 /**
  * Hub da área de IA.
@@ -23,7 +23,7 @@ export default async function AiHubPage() {
       isPlatformAdmin={user.is_platform_admin && !user.support}
       role={activeOrg?.role ?? null}
       interfaceSettings={activeOrg?.interface_settings}
-      title="Agente de IA"
+      title="Agente MIA"
       subtitle="Tudo que define quem atende por você — e como acompanhar o que ele faz."
     />
   );

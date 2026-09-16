@@ -56,7 +56,7 @@ describe("Sidebar agrupado", () => {
       .filter(Boolean);
     // Organização não tem título aqui: seu hub (Configurações) vive no rodapé
     // fixo, fora da área que rola — medido, ele caía fora da dobra até em 1080px.
-    expect(titulos).toEqual(["Atendimento", "CRM", "Agente de IA", "Canais", "Análise"]);
+    expect(titulos).toEqual(["Atendimento", "MIA CRM", "Agente MIA", "Canais", "MIA Insights"]);
   });
 
   it("leva às Etapas do funil pelo CRM, e não por Configurações", () => {
@@ -70,7 +70,7 @@ describe("Sidebar agrupado", () => {
     //
     // O que este teste prende é a porta EXISTIR no grupo certo do sidebar; que
     // ela desemboca na tela é o e2e `navegacao.spec.ts` que percorre, clicando.
-    const hub = screen.getByRole("link", { name: /Ver tudo em CRM/ });
+    const hub = screen.getByRole("link", { name: /Ver tudo no CRM/ });
     expect(hub).toHaveAttribute("href", "/app/crm");
     expect(screen.queryByRole("link", { name: "Etapas do funil" })).toBeNull();
   });
@@ -96,7 +96,7 @@ describe("Sidebar agrupado", () => {
     //
     // Canal oficial não está aqui de propósito: virou aba de Conexões no PR
     // #105, e Conexões é a porta.
-    const hubAnalise = screen.getByRole("link", { name: /Ver tudo em Análise/ });
+    const hubAnalise = screen.getByRole("link", { name: /Ver tudo no Insights/ });
     expect(hubAnalise).toHaveAttribute("href", "/app/analise");
     expect(screen.queryByRole("link", { name: /Audit Log/ })).toBeNull();
 
@@ -133,7 +133,12 @@ describe("Sidebar agrupado", () => {
   it("oferece o hub dos grupos que têm um", () => {
     comoPapel("admin");
     render(<Sidebar collapsed={false} />);
-    expect(screen.getByRole("link", { name: /Ver tudo em IA/ })).toHaveAttribute("href", "/app/ai");
+    // O rótulo acompanha o vocabulário da MIA ("Ver tudo no agente"); o que o
+    // caso prende continua sendo o HUB do grupo, não a frase.
+    expect(screen.getByRole("link", { name: /Ver tudo no agente/ })).toHaveAttribute(
+      "href",
+      "/app/ai",
+    );
   });
 
   it("colapsado esconde os títulos mas mantém os links", () => {

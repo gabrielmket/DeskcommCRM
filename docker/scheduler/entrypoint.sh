@@ -92,6 +92,11 @@ CRONS="
 # madrugada seguinte. Dia sem captura não quebra nada — a conversão cai na
 # cotação anterior e a tela diz de quando ela é.
 5 */6 * * *|30|api/v1/cron/cotacao-do-dolar
+# A FATURA da conta do provedor. Uma vez ao dia, depois da meia-noite UTC —
+# antes disso o dia não existe na fatura. Reconcilia 35 dias a cada rodada
+# porque dia fechado ainda muda (crédito, ajuste). Sem OPENAI_ADMIN_KEY ela
+# responde 200 dizendo que não há chave, e nada acontece.
+40 5 * * *|60|api/v1/cron/gasto-openai
 40 4 * * *|120|api/v1/cron/data-retention
 "
 

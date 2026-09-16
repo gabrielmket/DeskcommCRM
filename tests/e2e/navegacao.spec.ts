@@ -93,9 +93,9 @@ test.describe("navegação agrupada", () => {
     await expect(titulos).toHaveText([
       "Atendimento",
       "CRM",
-      "Agente de IA",
+      "Agente MIA",
       "Canais",
-      "Análise",
+      "MIA Insights",
     ]);
 
     await page.screenshot({
@@ -121,7 +121,7 @@ test.describe("navegação agrupada", () => {
     // agora mora atrás de "Ver tudo em CRM". Este teste percorre o caminho
     // INTEIRO em vez de checar um link: hub → tela. Que a porta existe no grupo
     // certo do sidebar é o unitário `sidebar-grupos` que prende.
-    await sidebar(page).getByRole("link", { name: "Ver tudo em CRM" }).click();
+    await sidebar(page).getByRole("link", { name: "Ver tudo no CRM" }).click();
     await page.waitForURL(/\/app\/crm$/);
     await expect(page.getByRole("heading", { name: "O dia a dia da venda" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Preparar a venda" })).toBeVisible();
@@ -141,7 +141,7 @@ test.describe("navegação agrupada", () => {
 
     await expect(sidebar(page).getByRole("link", { name: "Produtos" })).toHaveCount(0);
 
-    await sidebar(page).getByRole("link", { name: "Ver tudo em CRM" }).click();
+    await sidebar(page).getByRole("link", { name: "Ver tudo no CRM" }).click();
     await page.waitForURL(/\/app\/crm$/);
     await page.getByRole("link", { name: /Produtos/ }).click();
     await page.waitForURL(/\/app\/products/);

@@ -450,10 +450,10 @@ psql_run() { docker run --rm -i postgres:17-alpine psql "$(url_do_schema)" -v ON
 # `docker-compose.prod.yml`, `.env.hostgator.example` e a matriz de
 # `publish-image.yml` digam o mesmo. Se você é um fork, é lá que está a lista do
 # que trocar junto.
-IMG_NS="ghcr.io/melgarafael"
-IMG_APP="${IMG_NS}/deskcommcrm"
-IMG_WORKER="${IMG_NS}/deskcomm-worker"
-IMG_SCHEDULER="${IMG_NS}/deskcomm-scheduler"
+IMG_NS="ghcr.io/gabrielmket"
+IMG_APP="${IMG_NS}/mia-crm"
+IMG_WORKER="${IMG_NS}/mia-worker"
+IMG_SCHEDULER="${IMG_NS}/mia-scheduler"
 
 # A última versão publicada (ex.: "1.2.1"), ou vazio se não deu para saber.
 #
@@ -467,7 +467,7 @@ IMG_SCHEDULER="${IMG_NS}/deskcomm-scheduler"
 # alguém porque não deu para resolver um número de versão seria trocar um
 # problema de previsibilidade por um de disponibilidade.
 ultima_versao_publicada() {
-  local url="${1:-https://github.com/melgarafael/DeskcommCRM.git}" ref
+  local url="${1:-https://github.com/gabrielmket/mia.git}" ref
   command -v git >/dev/null 2>&1 || return 0
   # `grep -v -- -` descarta PRERELEASE (v1.11.0-rc1, v1.1.1-jmpo.1 — esta última
   # existe de verdade neste repo). O `--sort=-v:refname` do git põe o prerelease
@@ -495,7 +495,7 @@ ultima_versao_publicada() {
 # passe 5 da triagem.
 #
 # E o literal escapava da catraca por acidente: `namespace-das-imagens.test.ts`
-# procura a string contígua `ghcr.io/melgarafael`, e a URL do token a parte em
+# procura a string contígua `ghcr.io/gabrielmket`, e a URL do token a parte em
 # `ghcr.io/token?scope=repository:melgarafael/`.
 ghcr_status() {
   local img="$1" tag="$2" tok registry owner
@@ -876,7 +876,7 @@ setup_update_agent_cron() {
 
   # `cd` explícito: o agent.sh chama enter_project(), que acha o projeto pelo
   # DIRETÓRIO CORRENTE. No cron o CWD é o home do dono do crontab — sem o cd,
-  # a linha só funciona por acidente (instalação padrão em /root/deskcommcrm) e
+  # a linha só funciona por acidente (instalação padrão em /root/mia-crm) e
   # morre calada a cada 5 minutos em qualquer REPO_DIR customizado ou /opt.
   # A assinatura legada inclui o PROJECT_DIR: é o que distingue a linha desta
   # instalação da linha de uma vizinha, que roda o mesmo agent.sh em outra pasta.

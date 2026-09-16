@@ -74,6 +74,7 @@ export function UsageClient() {
             natureza={usageData.natureza}
             cotacao={usageData.cotacao}
             reais={usageData.reais}
+            fatura={usageData.fatura}
           />
           <UsageCharts series={usageData.series} />
           <UsageTable tenants={usageData.tenants} range={range} />

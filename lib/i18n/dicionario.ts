@@ -2935,6 +2935,11 @@ export const DICIONARIO: Traducoes = {
   "Por conversa": { es: "Por conversación" },
   "Total": { es: "Total" },
   "No período:": { es: "En el período:" },
+  "A OpenAI cobrou": { es: "La OpenAI cobró" },
+  "nos": { es: "en los" },
+  "dia(s) já fechados": { es: "día(s) ya cerrados" },
+  "medimos": { es: "medimos" },
+  "diferença de": { es: "diferencia de" },
   "MIA CRM": { es: "MIA CRM" },
   "A chave do provedor de IA é administrada pela plataforma.": {
     es: "La clave del proveedor de IA es administrada por la plataforma.",
