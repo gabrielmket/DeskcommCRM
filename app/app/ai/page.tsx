@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { NavHub } from "@/components/shell/NavHub";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { modulosDaOrganizacao } from "@/lib/modulos/liberacao";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Agente MIA" };
@@ -16,6 +18,11 @@ export const metadata: Metadata = { title: "Agente MIA" };
 export default async function AiHubPage() {
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
+  // O hub é INVENTÁRIO: ele mostra o que existe. Módulo não contratado não
+  // existe para esta empresa, então some daqui pelo mesmo critério do menu.
+  const modulos = activeOrg
+    ? [...(await modulosDaOrganizacao(await createClient(), activeOrg.orgId))]
+    : undefined;
 
   return (
     <NavHub
@@ -23,6 +30,7 @@ export default async function AiHubPage() {
       isPlatformAdmin={user.is_platform_admin && !user.support}
       role={activeOrg?.role ?? null}
       interfaceSettings={activeOrg?.interface_settings}
+      modulos={modulos}
       title="Agente MIA"
       subtitle="Tudo que define quem atende por você — e como acompanhar o que ele faz."
     />

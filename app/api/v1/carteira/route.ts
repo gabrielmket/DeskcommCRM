@@ -20,6 +20,7 @@ import { type NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
+import { moduloLiberado } from "@/lib/modulos/liberacao";
 import {
   creditoAcabando,
   derivarSaldo,
@@ -44,6 +45,14 @@ export async function GET(_req: NextRequest) {
   const { org } = authz;
 
   const db = await createClient();
+
+  // A guarda de VERDADE do módulo. O menu esconde a tela, e esconder não é
+  // recusar: link antigo, favorito e chamada direta continuam chegando aqui.
+  // Crédito só existe para gastar no disparador — mostrar saldo a quem não
+  // contratou seria vender por acidente.
+  if (!(await moduloLiberado(db, org.orgId, "disparador"))) {
+    return fail("forbidden", "Módulo não contratado.", 403, { requestId });
+  }
 
   const [extratoRes, todosRes, precoRes] = await Promise.all([
     db

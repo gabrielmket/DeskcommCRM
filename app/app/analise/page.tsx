@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { NavHub } from "@/components/shell/NavHub";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { modulosDaOrganizacao } from "@/lib/modulos/liberacao";
+import { createClient } from "@/lib/supabase/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +30,11 @@ export const metadata: Metadata = { title: "Análise" };
 export default async function AnaliseHubPage() {
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
+  // O hub é INVENTÁRIO: ele mostra o que existe. Módulo não contratado não
+  // existe para esta empresa, então some daqui pelo mesmo critério do menu.
+  const modulos = activeOrg
+    ? [...(await modulosDaOrganizacao(await createClient(), activeOrg.orgId))]
+    : undefined;
   const idioma = user.idioma;
 
   return (
@@ -36,6 +43,7 @@ export default async function AnaliseHubPage() {
       isPlatformAdmin={user.is_platform_admin && !user.support}
       role={activeOrg?.role ?? null}
       interfaceSettings={activeOrg?.interface_settings}
+      modulos={modulos}
       title={traduzir("Análise", idioma)}
       subtitle={traduzir(
         "Como o negócio foi no período — e o histórico para quando alguém perguntar por quê.",

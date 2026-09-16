@@ -148,6 +148,16 @@ export interface ActiveOrg {
    */
   visibility_mode?: VisibilityMode;
   /**
+   * Os módulos VENDÁVEIS que esta organização contratou (chaves de
+   * `lib/modulos/catalogo.ts`). Opcional: preenchido no layout, com o client
+   * de admin sobre a org do cookie já validado.
+   *
+   * ⚠️ É insumo de MENU, não de autorização. Quando vem ausente, a navegação
+   * não esconde nada — quem recusa é a ROTA, sempre. Esconder por não saber
+   * tiraria a tela de quem pagou toda vez que o campo não fosse carregado.
+   */
+  modulos?: string[];
+  /**
    * O que ESTA organização definiu para si — CAMPO A CAMPO, e só o que ela
    * mesma definiu.
    *

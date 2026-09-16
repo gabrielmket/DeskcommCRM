@@ -46,6 +46,9 @@ const TABS: TabItem[] = [
   // Dinheiro do cliente: crédito, preço acordado e extrato. Fica aqui, e não
   // no painel dele, porque recarregar e precificar são decisões de negócio.
   { label: "Carteira", href: "/carteira", disabled: false },
+  // O que este cliente comprou. Vizinha da Carteira de propósito: liberar um
+  // módulo e acertar o preço dele são a mesma conversa.
+  { label: "Módulos", href: "/modulos", disabled: false },
   { label: "Equipe", href: "/team", disabled: true },
   { label: "Uso", href: "/usage", disabled: true },
 ];

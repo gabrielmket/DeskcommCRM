@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { ROLE_RANK, type Role } from "@/lib/auth/types";
 import { NAV_CATALOG, type NavMetadata, type NavDestinationId } from "./catalogo";
+import { moduloDaTela } from "@/lib/modulos/catalogo";
 
 const ids = NAV_CATALOG.map((d) => d.href);
 export const interfaceSettingsSchema = z
@@ -77,14 +78,27 @@ export function destinosDaInterface(
   raw: unknown,
   platform: boolean,
   role: Role | null,
+  /**
+   * O que a organização CONTRATOU. `undefined` = não se sabe, e aí nada é
+   * escondido: a rota é que recusa, e sumir com a tela de quem pagou por não
+   * ter carregado uma lista seria trocar um erro visível por um invisível.
+   */
+  modulos?: string[],
 ): NavMetadata[] {
   const { settings } = lerInterface(raw);
   const allowed = permitidos(platform, role);
   const chosen =
     settings.destinos ?? (settings.preset === "simplificada" ? SIMPLIFICADA : undefined);
-  return allowed.filter(
-    (d) => essencial(d, role, platform) || !chosen || chosen.includes(d.href as NavDestinationId),
-  );
+  const contratados = modulos ? new Set(modulos) : null;
+  return allowed.filter((d) => {
+    if (contratados) {
+      const exigido = moduloDaTela(d.href);
+      // Admin de plataforma enxerga tudo: é ele quem libera, e precisa achar a
+      // tela para conferir o que o cliente vê.
+      if (exigido && !contratados.has(exigido) && !platform) return false;
+    }
+    return essencial(d, role, platform) || !chosen || chosen.includes(d.href as NavDestinationId);
+  });
 }
 export function interfaceTemDestino(
   settings: InterfaceSettings,

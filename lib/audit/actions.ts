@@ -165,6 +165,10 @@ export const AUDIT_ACTIONS = [
   // o extrato não se apaga — a correção é outro lançamento, que também entra.
   "platform_admin.carteira_lancada",
   "platform_admin.carteira_preco_definido",
+  // Liberação por módulo: é contrato. Quem liberou, para quem, quando — e o
+  // cancelamento, que é a metade que costuma sumir.
+  "platform_admin.modulo_liberado",
+  "platform_admin.modulo_cancelado",
   "platform_admin.users_listed",
   "platform_admin.user_viewed",
   "platform_admin.platform_admins_listed",
