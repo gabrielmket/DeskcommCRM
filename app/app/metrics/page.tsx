@@ -4,6 +4,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { ROLE_RANK } from "@/lib/auth/types";
 
 import { MetricsClient } from "./_components/MetricsClient";
+import { PainelDeMetas } from "@/components/metas/PainelDeMetas";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Desempenho" };
@@ -29,6 +30,10 @@ export default async function MetricsPage() {
             : t("Atrito, seu funil e sua performance nos últimos 30 dias.")}
         </p>
       </header>
+
+      {/* A meta vem ANTES do diagnóstico: quem abre Desempenho quer primeiro
+          saber se vai bater o mês, e só depois por que. */}
+      <PainelDeMetas />
 
       <MetricsClient canCompare={canCompare} currentUserId={user.id} />
     </div>
