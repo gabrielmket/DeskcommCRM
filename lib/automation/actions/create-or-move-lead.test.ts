@@ -161,3 +161,86 @@ it("CRM derivado propaga referência original sem observar ou abrir atendimento"
   expect(originRpc).toHaveBeenCalledWith("emit_event", expect.objectContaining({ p_payload: expect.objectContaining({ service_origin: {kind:"event",event_id:"evento-original",organization_id:ORG_ID,contact_id:"contato-1"} }) }));
   expect(originRpc.mock.calls.every(call => call[0] === "emit_event")).toBe(true);
 });
+
+/**
+ * A PASSAGEM DE BASTÃO ENTRE FUNIS.
+ *
+ * Recusar o movimento entre funis está certo — um negócio pertence a um funil, e
+ * arrastá-lo para outro apagaria o histórico de etapas dele. O que estava errado
+ * era a recusa valer também para o caso em que ninguém quis MOVER nada: SDR
+ * qualifica no funil dele, marca a reunião, e o comercial precisa de um card no
+ * funil DELE. Ali a recusa deixava a automação inteira muda — o vendedor não
+ * recebia nada porque o lead "já existia" noutro lugar —, e o sintoma é o pior
+ * tipo: a regra aparece ativa na tela e não faz nada.
+ *
+ * O padrão continua sendo recusar: regra já salva não muda de comportamento
+ * porque um campo novo nasceu.
+ */
+describe("create_or_move_lead — contato com negócio em OUTRO funil", () => {
+  const OUTRO = "99999999-0000-4000-8000-000000000099";
+
+  function ctxNoOutroFunil(db: ReturnType<typeof makeDb>): ActionCtx {
+    return {
+      admin: db.client as unknown as ActionCtx["admin"],
+      organizationId: ORG_ID,
+      ruleId: "rule-1",
+      ruleName: "Reunião marcada → card no comercial",
+      event: {} as ActionCtx["event"],
+      requestId: "req-1",
+      context: {
+        lead: { id: "lead-sdr", pipeline_id: OUTRO, contact_id: "contato-1", title: "Joana" },
+        contact: { id: "contato-1", name: "Joana" },
+      },
+    };
+  }
+
+  it("sem a escolha explícita, continua recusando — o padrão de sempre", async () => {
+    const db = makeDb({
+      pipelines: [funilRow({ id: PIPE, name: "COMERCIAL" })],
+      stages: [ETAPA_ORIGEM, ETAPA_DESTINO],
+      leads: [],
+    });
+
+    const r = await getAction("create_or_move_lead")!.execute(ctxNoOutroFunil(db), {
+      pipeline_id: PIPE,
+      stage_id: "triagem",
+    });
+
+    expect(
+      r.error,
+      "o padrão mudou sozinho: toda regra já salva de quem tem dois funis passou a abrir cards que ninguém pediu",
+    ).toBe("cross_pipeline_move_not_allowed");
+    expect(db.tabelas.crm_leads, "criou card mesmo recusando").toHaveLength(0);
+  });
+
+  it("com `abrir_novo_card`, nasce um card no funil de destino — e o de origem fica intacto", async () => {
+    const db = makeDb({
+      pipelines: [funilRow({ id: PIPE, name: "COMERCIAL" })],
+      stages: [ETAPA_ORIGEM, ETAPA_DESTINO],
+      leads: [],
+    });
+
+    const r = await getAction("create_or_move_lead")!.execute(ctxNoOutroFunil(db), {
+      pipeline_id: PIPE,
+      stage_id: "triagem",
+      quando_em_outro_funil: "abrir_novo_card",
+    });
+
+    expect(
+      r.status,
+      "a passagem de bastão não aconteceu: o vendedor não recebe card nenhum porque o lead já existe no funil do SDR",
+    ).toBe("success");
+    expect(db.tabelas.crm_leads, "o card do comercial não nasceu").toHaveLength(1);
+    const novo = db.tabelas.crm_leads[0]!;
+    expect(novo.pipeline_id, "o card nasceu no funil errado").toBe(PIPE);
+    expect(novo.stage_id, "o card nasceu fora da etapa escolhida na regra").toBe("triagem");
+    expect(
+      novo.contact_id,
+      "o card nasceu sem contato: o vendedor abre e não tem com quem falar",
+    ).toBe("contato-1");
+    expect(
+      (r.detail as Record<string, unknown>).de_outro_funil,
+      "o resultado não diz de onde veio: a tela de execuções da regra fica sem como explicar por que nasceu card novo",
+    ).toBe("lead-sdr");
+  });
+});

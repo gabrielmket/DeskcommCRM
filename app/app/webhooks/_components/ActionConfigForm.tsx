@@ -23,7 +23,14 @@ import { apiClient } from "@/lib/api/client";
 import type { FollowupFlowPointerRow } from "@/hooks/followup/useFollowupFlows";
 
 export type ActionItem =
-  | { type: "create_or_move_lead"; config: { pipeline_id: string; stage_id: string } }
+  | {
+      type: "create_or_move_lead";
+      config: {
+        pipeline_id: string;
+        stage_id: string;
+        quando_em_outro_funil?: "recusar" | "abrir_novo_card";
+      };
+    }
   | { type: "send_whatsapp_message"; config: { channel_session_id: string; template: string } }
   | {
       type: "send_ai_message";
@@ -67,7 +74,11 @@ interface FormProps<T> {
 function CreateOrMoveLeadForm({
   config,
   onChange,
-}: FormProps<{ pipeline_id: string; stage_id: string }>) {
+}: FormProps<{
+  pipeline_id: string;
+  stage_id: string;
+  quando_em_outro_funil?: "recusar" | "abrir_novo_card";
+}>) {
   const t = useT();
   const { data: pipelinesRes, isLoading: pipelinesLoading } = usePipelines();
   const { data: boardRes, isLoading: stagesLoading } = usePipelineStages(
@@ -117,6 +128,29 @@ function CreateOrMoveLeadForm({
             ))}
           </SelectContent>
         </Select>
+      </div>
+      {/* A passagem de bastão. Fica escondido atrás de uma escolha explícita
+          porque o padrão — recusar — está certo para quem tem um funil só, e
+          mudar o padrão faria regras já salvas passarem a criar cards. */}
+      <div className="space-y-1 sm:col-span-2">
+        <Label>{t("Se o contato já tiver negócio em outro funil")}</Label>
+        <Select
+          value={config.quando_em_outro_funil ?? "recusar"}
+          onValueChange={(v) =>
+            onChange({ ...config, quando_em_outro_funil: v as "recusar" | "abrir_novo_card" })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="recusar">{t("Não fazer nada")}</SelectItem>
+            <SelectItem value="abrir_novo_card">{t("Abrir um card novo aqui")}</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {t("O negócio de origem continua onde está — é cópia, não mudança de funil.")}
+        </p>
       </div>
     </div>
   );
