@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requirePlatformAdmin } from "@/lib/auth/requirePlatformAdmin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { separarGasto, type GastoSeparado } from "@/lib/ai/custo/natureza";
+import { taxaEfetiva, totalEmReais, type CotacaoDoDia } from "@/lib/ai/custo/cotacao";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { randomUUID } from "node:crypto";
@@ -62,8 +63,25 @@ export interface UsageData {
    * do sistema não. Ver `lib/ai/custo/natureza.ts`.
    */
   natureza: GastoSeparado;
-  /** Cotação declarada, para a tela falar em real sem inventar câmbio. */
+  /** Cotação de mercado mais recente — a tela diz de quando ela é. */
   cotacao: { usd_brl: number; cotado_em: string | null } | null;
+  /**
+   * O custo do período em REAIS, convertido DIA A DIA pela cotação daquele dia.
+   * Converter tudo pela cotação de hoje faria o custo de um mês fechado mudar
+   * sozinho quando o câmbio mexesse. `dias_sem_cotacao` > 0 = total parcial.
+   */
+  reais: {
+    total: number;
+    dias_sem_cotacao: number;
+    /**
+     * O dólar que a operação PAGOU de fato (recargas com valor em real
+     * informado): já traz IOF e spread do banco, medidos e não estimados. Nulo
+     * enquanto nenhuma recarga tiver os dois valores.
+     */
+    taxa_efetiva: number | null;
+    /** O mesmo custo pela taxa efetiva — é este que decide margem. */
+    total_pela_taxa_efetiva: number | null;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -317,5 +335,55 @@ export async function GET(req: NextRequest) {
     ? { usd_brl: Number(cotacaoRow.usd_brl), cotado_em: (cotacaoRow.cotado_em as string | null) ?? null }
     : null;
 
-  return ok<UsageData>({ range, tenants, series, natureza, cotacao }, { requestId });
+  // ---- o custo em REAIS, cada dia pela cotação DAQUELE dia ------------------
+  const { data: fxRows } = await admin
+    .from("platform_fx_rates")
+    .select("dia, usd_brl")
+    .gte("dia", startIso.slice(0, 10))
+    .order("dia", { ascending: false })
+    .limit(400);
+  // A cotação anterior ao início da janela também importa: um dia sem captura
+  // cai na mais recente ANTES dele, e sem esta segunda leitura o primeiro dia
+  // do período ficaria sem conversão sempre que o cron tivesse falhado nele.
+  const { data: fxAnterior } = await admin
+    .from("platform_fx_rates")
+    .select("dia, usd_brl")
+    .lt("dia", startIso.slice(0, 10))
+    .order("dia", { ascending: false })
+    .limit(1);
+  const historico: CotacaoDoDia[] = [...(fxRows ?? []), ...(fxAnterior ?? [])].map((r) => ({
+    dia: r.dia as string,
+    usd_brl: Number(r.usd_brl),
+  }));
+
+  const custosPorDia = dateLabels.map((date) => ({ dia: date, cents: aiCostDayMap.get(date) ?? 0 }));
+  const { reais: totalReais, semCotacao } = totalEmReais(custosPorDia, historico);
+
+  const { data: recargas } = await admin
+    .from("platform_ai_ledger")
+    .select("amount_usd, amount_brl")
+    .eq("tipo", "recarga");
+  const efetiva = taxaEfetiva(
+    (recargas ?? []).map((r) => ({
+      amount_usd: Number(r.amount_usd),
+      amount_brl: r.amount_brl === null || r.amount_brl === undefined ? null : Number(r.amount_brl),
+    })),
+  );
+
+  return ok<UsageData>(
+    {
+      range,
+      tenants,
+      series,
+      natureza,
+      cotacao,
+      reais: {
+        total: totalReais,
+        dias_sem_cotacao: semCotacao,
+        taxa_efetiva: efetiva,
+        total_pela_taxa_efetiva: efetiva === null ? null : (natureza.totalCents / 100) * efetiva,
+      },
+    },
+    { requestId },
+  );
 }

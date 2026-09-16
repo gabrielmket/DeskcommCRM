@@ -20,6 +20,13 @@ import type { GastoSeparado } from "@/lib/ai/custo/natureza";
 interface Props {
   natureza: GastoSeparado;
   cotacao: { usd_brl: number; cotado_em: string | null } | null;
+  /** Já convertido no servidor, dia a dia pela cotação daquele dia. */
+  reais: {
+    total: number;
+    dias_sem_cotacao: number;
+    taxa_efetiva: number | null;
+    total_pela_taxa_efetiva: number | null;
+  };
 }
 
 function emReais(cents: number, usdBrl: number): string {
@@ -51,7 +58,7 @@ function Cartao({
   );
 }
 
-export function NaturezaDoGasto({ natureza, cotacao }: Props) {
+export function NaturezaDoGasto({ natureza, cotacao, reais }: Props) {
   const t = useT();
   const tagDoIdioma = useTagDeIdioma();
   const { atendimentoCents, sistemaCents, totalCents, conversas, porConversaCents, semPreco } = natureza;
@@ -106,6 +113,37 @@ export function NaturezaDoGasto({ natureza, cotacao }: Props) {
           cotacao={cotacao}
         />
       </div>
+
+      {/* O que a conversão custa de verdade: recarga com cartão brasileiro embute
+          spread do banco e IOF, e é a taxa EFETIVA que decide margem. Ela é
+          medida (reais que saíram ÷ dólares que entraram), nunca estimada. */}
+      <p className="text-xs text-muted-foreground">
+        {t("No período:")}{" "}
+        <span className="font-medium text-foreground">
+          {reais.total.toLocaleString(tagDoIdioma, { style: "currency", currency: "BRL" })}
+        </span>{" "}
+        {t("pela cotação de cada dia")}
+        {reais.total_pela_taxa_efetiva !== null && reais.taxa_efetiva !== null ? (
+          <>
+            {" · "}
+            <span className="font-medium text-foreground">
+              {reais.total_pela_taxa_efetiva.toLocaleString(tagDoIdioma, {
+                style: "currency",
+                currency: "BRL",
+              })}
+            </span>{" "}
+            {t("pelo dólar que você pagou")} (R$ {reais.taxa_efetiva.toLocaleString(tagDoIdioma, { minimumFractionDigits: 4 })})
+          </>
+        ) : (
+          <>
+            {" · "}
+            {t("informe o valor em reais das recargas para ver o custo com IOF")}
+          </>
+        )}
+        {reais.dias_sem_cotacao > 0 ? (
+          <> {" · "}{reais.dias_sem_cotacao} {t("dia(s) sem cotação, total parcial")}</>
+        ) : null}
+      </p>
 
       {semPreco > 0 ? (
         // A ressalva que impede ler um piso como se fosse a conta inteira.

@@ -122,6 +122,7 @@ function Formulario() {
   const [tipo, setTipo] = useState<"recarga" | "leitura">("recarga");
   const [valor, setValor] = useState("");
   const [quando, setQuando] = useState("");
+  const [reais, setReais] = useState("");
   const [nota, setNota] = useState("");
 
   const numero = Number(valor.replace(",", "."));
@@ -138,11 +139,17 @@ function Formulario() {
             tipo,
             amount_usd: numero,
             ...(quando ? { occurred_at: new Date(quando).toISOString() } : {}),
+            // Só em recarga: é o par (reais que saíram, dólares que entraram)
+            // que revela IOF e spread sem ninguém estimar percentual.
+            ...(tipo === "recarga" && Number(reais.replace(",", ".")) > 0
+              ? { amount_brl: Number(reais.replace(",", ".")) }
+              : {}),
             ...(nota.trim() ? { note: nota.trim() } : {}),
           },
           {
             onSuccess: () => {
               setValor("");
+              setReais("");
               setNota("");
               setQuando("");
             },
@@ -177,6 +184,21 @@ function Formulario() {
           onChange={(e) => setValor(e.target.value)}
         />
       </div>
+      {tipo === "recarga" ? (
+        <div className="space-y-1">
+          <label className="block text-xs text-muted-foreground" htmlFor="saldo-reais">
+            {t("Quanto saiu em R$ (opcional)")}
+          </label>
+          <Input
+            id="saldo-reais"
+            className="w-36"
+            inputMode="decimal"
+            placeholder="64,00"
+            value={reais}
+            onChange={(e) => setReais(e.target.value)}
+          />
+        </div>
+      ) : null}
       <div className="space-y-1">
         <label className="block text-xs text-muted-foreground" htmlFor="saldo-quando">
           {t("Quando (opcional)")}
@@ -301,7 +323,18 @@ function Lancamentos({ linhas }: { linhas: Saldo["lancamentos"] }) {
                 {l.tipo === "recarga" ? "+" : ""}
                 {usd(l.amount_usd, tag)}
               </td>
-              <td className="px-3 py-2 text-muted-foreground">{l.note ?? "—"}</td>
+              <td className="px-3 py-2 text-muted-foreground">
+                {/* O valor em reais fica ao lado da observação: é o que explica
+                    por que o seu dólar custou mais que o do mercado. */}
+                {l.amount_brl !== null
+                  ? [
+                      l.amount_brl.toLocaleString(tag, { style: "currency", currency: "BRL" }),
+                      l.note,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : (l.note ?? "—")}
+              </td>
               <td className="px-3 py-2 text-right">
                 <Button
                   type="button"

@@ -87,7 +87,10 @@ export function UsageChart({ payload }: Props) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <ChartCard title={t("Quanto gastou por dia (R$)")}>
+      {/* US$ e não R$: o eixo e os pontos saem de `llm_calls.cost_cents`, que é
+          centavo de DÓLAR (lib/money.ts). O título dizia R$ e o gráfico mostrava
+          US$ — a mesma confusão que `formatCentsUSD` existe para matar. */}
+      <ChartCard title={t("Quanto gastou por dia (US$)")}>
         {!hasCost ? (
           <EmptyChart />
         ) : (

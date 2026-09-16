@@ -86,6 +86,12 @@ CRONS="
 0 12 * * *|60|api/v1/cron/lgpd-sla-watcher
 30 3 * * *|120|api/v1/cron/kb-conversations-batch
 15 4 * * *|60|api/v1/cron/sync-model-catalog
+# A COTAÇÃO. Quatro vezes ao dia: o painel converte custo em dólar para real, e
+# o dia de HOJE é convertido pela cotação mais recente. Uma vez ao dia bastaria
+# para o histórico, mas deixaria a tela de hoje com a cotação de ontem até a
+# madrugada seguinte. Dia sem captura não quebra nada — a conversão cai na
+# cotação anterior e a tela diz de quando ela é.
+5 */6 * * *|30|api/v1/cron/cotacao-do-dolar
 40 4 * * *|120|api/v1/cron/data-retention
 "
 

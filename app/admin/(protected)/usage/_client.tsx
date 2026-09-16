@@ -70,7 +70,11 @@ export function UsageClient() {
         <>
           {/* Antes dos gráficos: a separação é a informação que decide preço.
               Ver lib/ai/custo/natureza.ts. */}
-          <NaturezaDoGasto natureza={usageData.natureza} cotacao={usageData.cotacao} />
+          <NaturezaDoGasto
+            natureza={usageData.natureza}
+            cotacao={usageData.cotacao}
+            reais={usageData.reais}
+          />
           <UsageCharts series={usageData.series} />
           <UsageTable tenants={usageData.tenants} range={range} />
         </>

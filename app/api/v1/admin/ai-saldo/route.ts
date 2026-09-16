@@ -42,6 +42,9 @@ const lancamentoSchema = z.object({
   // Em DÓLAR, que é a moeda em que o provedor cobra. O real aparece na tela
   // pela cotação declarada, e nunca é gravado aqui.
   amount_usd: z.number().finite().min(0).max(1_000_000),
+  // Quanto saiu em REAIS: com o valor em dólar, dá a taxa efetiva paga — IOF e
+  // spread do banco dentro, medidos em vez de estimados. Só faz sentido em recarga.
+  amount_brl: z.number().finite().min(0).max(10_000_000).optional(),
   occurred_at: z.string().datetime().optional(),
   note: z.string().trim().max(200).optional(),
 });
@@ -55,6 +58,8 @@ interface Lancamento {
   id: string;
   tipo: "recarga" | "leitura";
   amount_usd: number;
+  /** Só em recarga, e só quando informado: é o que revela IOF e spread. */
+  amount_brl: number | null;
   occurred_at: string;
   note: string | null;
 }
@@ -76,7 +81,7 @@ export async function GET(_req: NextRequest) {
 
   const { data: linhas, error } = await admin
     .from("platform_ai_ledger")
-    .select("id, tipo, amount_usd, occurred_at, note")
+    .select("id, tipo, amount_usd, amount_brl, occurred_at, note")
     .order("occurred_at", { ascending: false })
     .limit(100);
   if (error) return fail("db_error", "Falha ao ler os lançamentos.", 500, { requestId });
@@ -85,6 +90,7 @@ export async function GET(_req: NextRequest) {
     id: l.id as string,
     tipo: l.tipo as "recarga" | "leitura",
     amount_usd: Number(l.amount_usd),
+    amount_brl: l.amount_brl === null || l.amount_brl === undefined ? null : Number(l.amount_brl),
     occurred_at: l.occurred_at as string,
     note: (l.note as string | null) ?? null,
   }));
@@ -180,11 +186,12 @@ export async function POST(req: NextRequest) {
     .insert({
       tipo: parsed.data.tipo,
       amount_usd: parsed.data.amount_usd,
+      amount_brl: parsed.data.tipo === "recarga" ? (parsed.data.amount_brl ?? null) : null,
       occurred_at: parsed.data.occurred_at ?? new Date().toISOString(),
       note: parsed.data.note ?? null,
       created_by: ctx.user.id,
     })
-    .select("id, tipo, amount_usd, occurred_at, note")
+    .select("id, tipo, amount_usd, amount_brl, occurred_at, note")
     .single();
   if (error || !data) return fail("db_error", "Falha ao registrar o lançamento.", 500, { requestId });
 

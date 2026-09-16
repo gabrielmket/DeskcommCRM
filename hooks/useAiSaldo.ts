@@ -7,6 +7,8 @@ export interface LancamentoDeSaldo {
   id: string;
   tipo: "recarga" | "leitura";
   amount_usd: number;
+  /** Reais que saíram nesta recarga — com o dólar, dá a taxa efetiva (IOF + spread). */
+  amount_brl: number | null;
   occurred_at: string;
   note: string | null;
 }
@@ -43,6 +45,7 @@ export function useLancarSaldo() {
     mutationFn: (corpo: {
       tipo: "recarga" | "leitura";
       amount_usd: number;
+      amount_brl?: number;
       occurred_at?: string;
       note?: string;
     }) => apiClient.post<{ data: LancamentoDeSaldo }>("/api/v1/admin/ai-saldo", corpo),
