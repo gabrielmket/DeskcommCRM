@@ -20,7 +20,7 @@
 import { describe, expect, it } from "vitest";
 
 import { podeVerCusto, semCusto } from "@/lib/ai/custo-e-da-plataforma";
-import { NAV_CATALOG } from "@/lib/navigation/catalogo";
+import { NAV_CATALOG, type NavMetadata } from "@/lib/navigation/catalogo";
 import { canSee } from "@/lib/navigation/interface";
 
 const daPlataforma = { is_platform_admin: true, support: null };
@@ -74,7 +74,10 @@ describe("o custo sai da resposta, não da tela", () => {
 });
 
 describe("o destino 'Uso e orçamento' é da plataforma", () => {
-  const uso = NAV_CATALOG.find((d) => d.href === "/app/ai/usage");
+  // `NAV_CATALOG` é tupla literal (`as const`): lido pelo TIPO do catálogo, e não
+  // pelo literal de cada entrada, o campo opcional existe em todas elas.
+  const catalogo: readonly NavMetadata[] = NAV_CATALOG;
+  const uso = catalogo.find((d) => d.href === "/app/ai/usage");
 
   it("existe e está marcado como somentePlataforma", () => {
     expect(uso?.somentePlataforma).toBe(true);
@@ -89,7 +92,7 @@ describe("o destino 'Uso e orçamento' é da plataforma", () => {
   });
 
   it("a marca não vazou para outros destinos: o resto do menu segue por papel", () => {
-    const marcados = NAV_CATALOG.filter((d) => d.somentePlataforma).map((d) => d.href);
+    const marcados = catalogo.filter((d) => d.somentePlataforma === true).map((d) => d.href);
     expect(marcados).toEqual(["/app/ai/usage"]);
   });
 });
