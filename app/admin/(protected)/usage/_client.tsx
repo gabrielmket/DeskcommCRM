@@ -11,6 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminUsage, type UsageRange } from "@/hooks/useAdminUsage";
 import { UsageCharts } from "@/components/admin/usage/UsageCharts";
 import { UsageTable } from "@/components/admin/usage/UsageTable";
+import { NaturezaDoGasto } from "@/components/admin/usage/NaturezaDoGasto";
+import { SaldoDoProvedorSecao } from "@/components/admin/usage/SaldoDoProvedor";
 import { useT } from "@/hooks/i18n/useT";
 
 const RANGE_OPTIONS: { value: UsageRange; label: string }[] = [
@@ -66,10 +68,16 @@ export function UsageClient() {
         </div>
       ) : (
         <>
+          {/* Antes dos gráficos: a separação é a informação que decide preço.
+              Ver lib/ai/custo/natureza.ts. */}
+          <NaturezaDoGasto natureza={usageData.natureza} cotacao={usageData.cotacao} />
           <UsageCharts series={usageData.series} />
           <UsageTable tenants={usageData.tenants} range={range} />
         </>
       )}
+
+      {/* Independe do período escolhido acima: saldo é estado da conta, não da janela. */}
+      <SaldoDoProvedorSecao />
     </div>
   );
 }

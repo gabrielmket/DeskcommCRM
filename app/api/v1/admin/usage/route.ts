@@ -2,6 +2,7 @@ import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { requirePlatformAdmin } from "@/lib/auth/requirePlatformAdmin";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { separarGasto, type GastoSeparado } from "@/lib/ai/custo/natureza";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { randomUUID } from "node:crypto";
@@ -55,6 +56,14 @@ export interface UsageData {
   range: "7d" | "30d" | "90d";
   tenants: UsageTenantRow[];
   series: UsageSeries;
+  /**
+   * As duas naturezas de gasto, separadas — somá-las esconde a decisão de preço:
+   * atendimento varia com a conversa (e cabe num plano por conversa), operação
+   * do sistema não. Ver `lib/ai/custo/natureza.ts`.
+   */
+  natureza: GastoSeparado;
+  /** Cotação declarada, para a tela falar em real sem inventar câmbio. */
+  cotacao: { usd_brl: number; cotado_em: string | null } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,11 +169,13 @@ export async function GET(req: NextRequest) {
   const aiInvCountMap = new Map<string, number>();
   const aiTokensMap = new Map<string, number>();
   const aiCostMap = new Map<string, number>();
+  // As mesmas linhas servem à separação por natureza — uma leitura só.
+  const linhasDeGasto: { purpose: string; cost_cents: number | string | null; contact_id: string | null }[] = [];
 
   if (orgIds.length > 0) {
     const { data: aiRows, error: aiErr } = await admin
       .from("llm_calls")
-      .select("organization_id, input_tokens, output_tokens, cost_cents")
+      .select("organization_id, input_tokens, output_tokens, cost_cents, purpose, contact_id")
       .in("organization_id", orgIds)
       .gte("created_at", startIso);
     if (!aiErr && aiRows) {
@@ -179,8 +190,13 @@ export async function GET(req: NextRequest) {
         );
         aiCostMap.set(
           oid,
-          (aiCostMap.get(oid) ?? 0) + ((row.cost_cents as number) ?? 0),
+          (aiCostMap.get(oid) ?? 0) + Number(row.cost_cents ?? 0),
         );
+        linhasDeGasto.push({
+          purpose: (row.purpose as string) ?? "",
+          cost_cents: (row.cost_cents as number | string | null) ?? null,
+          contact_id: (row.contact_id as string | null) ?? null,
+        });
       }
     }
   }
@@ -290,5 +306,16 @@ export async function GET(req: NextRequest) {
     requestId,
   });
 
-  return ok<UsageData>({ range, tenants, series }, { requestId });
+  const natureza = separarGasto(linhasDeGasto);
+
+  const { data: cotacaoRow } = await admin
+    .from("platform_ai_custo")
+    .select("usd_brl, cotado_em")
+    .eq("id", 1)
+    .maybeSingle();
+  const cotacao = cotacaoRow?.usd_brl
+    ? { usd_brl: Number(cotacaoRow.usd_brl), cotado_em: (cotacaoRow.cotado_em as string | null) ?? null }
+    : null;
+
+  return ok<UsageData>({ range, tenants, series, natureza, cotacao }, { requestId });
 }
