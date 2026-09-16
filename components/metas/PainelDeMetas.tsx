@@ -16,6 +16,8 @@ import { useState } from "react";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
 import { useMetas } from "@/hooks/useMetas";
+import { usePermission } from "@/hooks/auth/AuthProvider";
+import { DefinirMeta } from "./DefinirMeta";
 import type { ProgressoDaMeta } from "@/lib/crm/metas/progresso";
 
 const ROTULO: Record<ProgressoDaMeta["metrica"], string> = {
@@ -77,6 +79,8 @@ export function PainelDeMetas() {
   const tag = useTagDeIdioma();
   const [periodo, setPeriodo] = useState(mesAtual());
   const { data, isLoading, isError } = useMetas(periodo);
+  // A mesma régua da rota (spec 13 §4: gestão é manager+).
+  const podeDefinir = usePermission("metas.definir");
 
   return (
     <section className="space-y-4">
@@ -87,6 +91,10 @@ export function PainelDeMetas() {
             {t("O quanto já foi feito sai do próprio funil e da agenda — não é digitado.")}
           </p>
         </div>
+        <div className="flex items-end gap-3">
+          {/* Definir meta é decisão de gestão (a rota exige manager+). Oferecer
+              o botão a quem levaria 403 é prometer o que não se cumpre. */}
+          {podeDefinir ? <DefinirMeta periodo={periodo} /> : null}
         <label className="text-xs text-muted-foreground">
           {t("Mês")}
           <input
@@ -96,6 +104,7 @@ export function PainelDeMetas() {
             onChange={(e) => setPeriodo(e.target.value || mesAtual())}
           />
         </label>
+        </div>
       </div>
 
       {isLoading ? (
@@ -108,9 +117,13 @@ export function PainelDeMetas() {
         <>
           {data.metas.length === 0 ? (
             <p className="rounded-md border p-4 text-sm text-muted-foreground">
-              {t(
-                "Nenhuma meta definida para este mês. Quem define é quem gerencia, e o acompanhamento aparece aqui na hora.",
-              )}
+              {podeDefinir
+                ? t(
+                    "Nenhuma meta definida para este mês. Use \"Definir meta\" acima — o acompanhamento aparece aqui na hora.",
+                  )
+                : t(
+                    "Nenhuma meta definida para este mês. Quem define é quem gerencia, e o acompanhamento aparece aqui na hora.",
+                  )}
             </p>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">

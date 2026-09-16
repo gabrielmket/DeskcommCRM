@@ -26,6 +26,7 @@ import {
   type Meta,
   type ReuniaoMarcada,
 } from "@/lib/crm/metas/progresso";
+import { FUSO_PADRAO, janelaDoMes } from "@/lib/crm/metas/fuso";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
@@ -69,11 +70,23 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   const db = await createClient();
   const dia1 = primeiroDia(periodo);
-  // Fim EXCLUSIVO do mês: `lt` no primeiro dia do mês seguinte pega o mês
-  // inteiro sem depender de quantos dias ele tem.
-  const proximoMes = new Date(`${dia1}T00:00:00Z`);
-  proximoMes.setUTCMonth(proximoMes.getUTCMonth() + 1);
-  const fim = proximoMes.toISOString();
+
+  /**
+   * O mês fecha no fuso de QUEM OPERA, não em Greenwich.
+   *
+   * Em UTC, o mês de uma empresa em São Paulo terminava às 21h do último dia: a
+   * venda fechada às 22h do dia 30 caía em outubro e a reunião marcada à noite
+   * sumia do mês em que aconteceu. O total do ano não muda — por isso ninguém
+   * notava — e o erro aparecia na conferência de comissão, um mês depois.
+   */
+  const { data: orgRow } = await db
+    .from("organizations")
+    .select("timezone")
+    .eq("id", org.orgId)
+    .maybeSingle();
+  const fuso = (orgRow?.timezone as string | null) || FUSO_PADRAO;
+  const janela = janelaDoMes(periodo, fuso);
+  const fim = janela.fim;
 
   const [metasRes, leadsRes, reunioesRes] = await Promise.all([
     db
@@ -88,14 +101,14 @@ export async function GET(req: NextRequest): Promise<Response> {
       )
       .eq("organization_id", org.orgId)
       .eq("status", "won")
-      .gte("closed_at", `${dia1}T00:00:00Z`)
+      .gte("closed_at", janela.inicio)
       .lt("closed_at", fim)
       .limit(10_000),
     db
       .from("calendar_appointments")
       .select("created_by_user_id, created_by_agent_id, created_at, status")
       .eq("organization_id", org.orgId)
-      .gte("created_at", `${dia1}T00:00:00Z`)
+      .gte("created_at", janela.inicio)
       .lt("created_at", fim)
       .limit(10_000),
   ]);
@@ -154,12 +167,15 @@ export async function GET(req: NextRequest): Promise<Response> {
   return ok(
     {
       periodo,
-      metas: metas.map((m) => progressoDaMeta(m, leads, reunioes, funisDeReceita)),
-      resumo: resumoDoMes(leads, dia1, funisDeReceita),
+      metas: metas.map((m) => progressoDaMeta(m, leads, reunioes, funisDeReceita, fuso)),
+      resumo: resumoDoMes(leads, dia1, funisDeReceita, fuso),
       // Marcar e comparecer são medidas diferentes. O desfecho já era gravado
       // (a Agenda tem "Realizado"/"Faltou" e o agente registra sozinho) e não
       // era somado em lugar nenhum.
-      reunioes: resumoDasReunioes(reunioes, dia1),
+      reunioes: resumoDasReunioes(reunioes, dia1, fuso),
+      // A tela precisa poder dizer "mês fechado no fuso de São Paulo" em vez de
+      // deixar o leitor supor que é o mês dele.
+      fuso,
       // A tela precisa poder dizer "receita só do comercial" em vez de deixar o
       // número parecer o total da casa.
       funis_que_contam_receita: funisDeReceita ? [...funisDeReceita] : null,

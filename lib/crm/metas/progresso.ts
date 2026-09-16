@@ -53,6 +53,8 @@
  * funil que "não é receita" zeraria a meta dele.
  */
 
+import { FUSO_PADRAO, mesNoFuso } from "./fuso";
+
 export type MetricaDeMeta =
   | "reunioes"
   | "reunioes_realizadas"
@@ -123,22 +125,26 @@ function ganhasComReceita(
   leads: readonly LeadFechado[],
   periodo: string,
   funisDeReceita: FunisDeReceita,
+  fuso: string,
 ): LeadFechado[] {
   return leads.filter(
     (l) =>
       l.status === "won" &&
-      dentroDoMes(l.closed_at, periodo) &&
+      dentroDoMes(l.closed_at, periodo, fuso) &&
       (funisDeReceita === null || funisDeReceita.has(l.pipeline_id)),
   );
 }
 
-/** O mês de uma data ISO, em AAAA-MM. */
-function mesDe(iso: string | null): string | null {
-  return iso ? iso.slice(0, 7) : null;
-}
-
-function dentroDoMes(iso: string | null, periodo: string): boolean {
-  return mesDe(iso) === periodo.slice(0, 7);
+/**
+ * Este instante caiu no mês da meta?
+ *
+ * O fuso é de QUEM OPERA, e não Greenwich: cortar o mês às 21h do dia 30 (que é
+ * o que UTC faz com uma empresa em São Paulo) joga a venda daquela noite para o
+ * mês seguinte. O total do ano não muda, e por isso ninguém nota — o erro
+ * aparece na conferência de comissão, um mês depois. Ver lib/crm/metas/fuso.ts.
+ */
+function dentroDoMes(iso: string | null, periodo: string, fuso: string): boolean {
+  return mesNoFuso(iso, fuso) === periodo.slice(0, 7);
 }
 
 /**
@@ -152,10 +158,11 @@ export function realizadoDaMeta(
   leads: readonly LeadFechado[],
   reunioes: readonly ReuniaoMarcada[],
   funisDeReceita: FunisDeReceita = null,
+  fuso: string = FUSO_PADRAO,
 ): number {
   if (meta.metrica === "reunioes" || meta.metrica === "reunioes_realizadas") {
     const doResponsavel = reunioes.filter((r) => {
-      if (!dentroDoMes(r.created_at, meta.periodo)) return false;
+      if (!dentroDoMes(r.created_at, meta.periodo, fuso)) return false;
       if (meta.user_id) return r.marcada_por_user_id === meta.user_id;
       if (meta.agent_id) return r.marcada_por_agent_id === meta.agent_id;
       // Meta da organização: conta tudo, inclusive o que a IA marcou.
@@ -166,7 +173,7 @@ export function realizadoDaMeta(
       : doResponsavel.filter((r) => r.status === "completed").length;
   }
 
-  const ganhas = ganhasComReceita(leads, meta.periodo, funisDeReceita);
+  const ganhas = ganhasComReceita(leads, meta.periodo, funisDeReceita, fuso);
 
   if (meta.metrica === "receita_originada") {
     // A pergunta aqui é a do SDR: quanto da receita fechada nasceu do trabalho
@@ -198,8 +205,9 @@ export function progressoDaMeta(
   leads: readonly LeadFechado[],
   reunioes: readonly ReuniaoMarcada[],
   funisDeReceita: FunisDeReceita = null,
+  fuso: string = FUSO_PADRAO,
 ): ProgressoDaMeta {
-  const realizado = realizadoDaMeta(meta, leads, reunioes, funisDeReceita);
+  const realizado = realizadoDaMeta(meta, leads, reunioes, funisDeReceita, fuso);
   const contagem = meta.metrica === "reunioes" || meta.metrica === "reunioes_realizadas";
   const alvo = contagem ? (meta.alvo_quantidade ?? 0) : (meta.alvo_cents ?? 0);
   return {
@@ -249,8 +257,9 @@ export interface ResumoDasReunioes {
 export function resumoDasReunioes(
   reunioes: readonly ReuniaoMarcada[],
   periodo: string,
+  fuso: string = FUSO_PADRAO,
 ): ResumoDasReunioes {
-  const doMes = reunioes.filter((r) => dentroDoMes(r.created_at, periodo));
+  const doMes = reunioes.filter((r) => dentroDoMes(r.created_at, periodo, fuso));
   const realizadas = doMes.filter((r) => r.status === "completed").length;
   const faltas = doMes.filter((r) => r.status === "no_show").length;
   const comDesfecho = realizadas + faltas;
@@ -278,10 +287,11 @@ export function resumoDoMes(
   leads: readonly LeadFechadoComPrazo[],
   periodo: string,
   funisDeReceita: FunisDeReceita = null,
+  fuso: string = FUSO_PADRAO,
 ): ResumoDoMes {
   // A MESMA régua das metas, de propósito: se o resumo somasse um funil que a
   // meta não soma, a tela mostraria dois totais diferentes do mesmo mês.
-  const ganhas = ganhasComReceita(leads, periodo, funisDeReceita) as LeadFechadoComPrazo[];
+  const ganhas = ganhasComReceita(leads, periodo, funisDeReceita, fuso) as LeadFechadoComPrazo[];
 
   let recorrente = 0;
   let avulso = 0;

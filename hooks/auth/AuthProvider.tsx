@@ -140,6 +140,9 @@ const ACTION_MIN_ROLE: Record<string, Role> = {
   "ai.credentials.view": "manager",
   "ai.credentials.write": "admin",
   "webhooks.manage": "manager",
+  // Definir a meta do mês é ato de GESTÃO, e a rota POST /api/v1/metas exige
+  // o mesmo piso. Oferecer o botão a quem levaria 403 promete o que não cumpre.
+  "metas.definir": "manager",
   // Chamada de voz (spec 18). `agent` porque ligar e atender é ato de
   // atendimento, não de configuração — e porque é o piso que as rotas de
   // `app/api/v1/voice/calls/*` exigem. Quem não alcança este piso (viewer, e
