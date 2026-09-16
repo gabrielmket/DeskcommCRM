@@ -456,7 +456,25 @@ const marcarShape = {
   contact_id: z.string().uuid().describe("quem vai ser atendido"),
   owner_user_id: z.string().uuid().optional(),
   title: z.string().min(1).max(200).optional(),
-  notes: z.string().max(2000).optional(),
+  /**
+   * O RESUMO DA QUALIFICAÇÃO — e o `describe` é o que faz ele existir.
+   *
+   * O campo já estava aqui, sem descrição, e o modelo o deixava vazio quase
+   * sempre: ele não tinha como saber que alguém do outro lado leria isto. O
+   * aviso que o time recebe no grupo e o card que nasce no funil mostram este
+   * texto — sem ele, o vendedor recebe "reunião marcada com Joana" e entra na
+   * sala sabendo o mesmo que saberia sem o sistema.
+   */
+  notes: z
+    .string()
+    .max(2000)
+    .optional()
+    .describe(
+      "o resumo do que você apurou na conversa, para quem vai atender: o que a pessoa quer, " +
+        "o que já tem hoje, o que a incomoda, prazo e orçamento quando ela disse, e o que ficou " +
+        "combinado. Escreva em frases curtas, só o que ela falou — nada de suposição sua. Isto " +
+        "vai para a equipe, não para o cliente.",
+    ),
   /**
    * O convidado do Google. O handler e a tela já tinham o campo; a ferramenta
    * da IA não, e o agente pedia o e-mail "para o convite" sem ter como mandá-lo:
@@ -477,7 +495,8 @@ export const crmBookAppointment: McpToolDefinition<typeof marcarShape> = {
     "`crm_schedule_followup`. A diferença: aqui as DUAS partes combinaram e alguém vai esperar; " +
     "lá é decisão interna nossa e o cliente não sabe de nada. " +
     "Chame `crm_find_free_slots` ANTES e use um `starts_at` que veio de lá — marcar em horário que " +
-    "não está livre é recusado, e a recusa manda você consultar de novo.",
+    "não está livre é recusado, e a recusa manda você consultar de novo. " +
+    "SEMPRE preencha `notes` com o resumo do que você apurou: é o que a equipe lê antes de atender.",
   inputSchema: marcarShape,
   category: "write",
   requiresRole: "ai_operator",
