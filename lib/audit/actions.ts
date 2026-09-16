@@ -161,6 +161,10 @@ export const AUDIT_ACTIONS = [
   "platform_admin.ai_saldo_lancado",
   "platform_admin.ai_saldo_lancamento_apagado",
   "platform_admin.ai_cotacao_definida",
+  // Carteira do CLIENTE: crédito lançado e preço acordado são dinheiro dele, e
+  // o extrato não se apaga — a correção é outro lançamento, que também entra.
+  "platform_admin.carteira_lancada",
+  "platform_admin.carteira_preco_definido",
   "platform_admin.users_listed",
   "platform_admin.user_viewed",
   "platform_admin.platform_admins_listed",

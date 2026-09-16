@@ -37,6 +37,7 @@ import {
   UserCircle,
   Users,
   UsersThree,
+  Wallet,
   WebhooksLogo,
 } from "@/lib/ui/icons";
 
@@ -86,6 +87,7 @@ const ICONS = {
   UserCircle,
   Users,
   UsersThree,
+  Wallet,
   WebhooksLogo,
 };
 export interface NavDestination extends Omit<NavMetadata, "icon"> {

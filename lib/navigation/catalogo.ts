@@ -582,6 +582,24 @@ export const NAV_CATALOG = [
     section: "Sua conta",
   },
   {
+    // O CRÉDITO do cliente, e o extrato que o explica. Mora em Organização e
+    // não em Análise porque é dinheiro e contrato — vizinha de Equipe e de
+    // Conversões —, e porque o extrato responde "por que meu saldo caiu",
+    // que é pergunta de quem paga, não de quem mede.
+    //
+    // ⚠️ Mostra o que o CLIENTE paga, nunca o que a operação gasta. As duas
+    // contas não se encontram em tela nenhuma (ver lib/ai/custo-e-da-plataforma.ts).
+    href: "/app/settings/carteira",
+    label: "Créditos",
+    description: "Quanto crédito a empresa tem para disparos, e o que já foi consumido.",
+    icon: "Wallet",
+    group: "organizacao",
+    section: "Sua empresa",
+    // manager+: o extrato diz quanto a empresa gastou, que não é informação de
+    // atendente. A rota recusa igual, e não depende deste rótulo.
+    minRole: "manager",
+  },
+  {
     href: "/app/team",
     label: "Equipe",
     description: "Quem trabalha aqui, com qual papel e quanta conversa cada um aguenta.",

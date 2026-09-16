@@ -43,6 +43,9 @@ interface TabItem {
 const TABS: TabItem[] = [
   { label: "Visão Geral", href: "", disabled: false },
   { label: "Saúde", href: "/health", disabled: false },
+  // Dinheiro do cliente: crédito, preço acordado e extrato. Fica aqui, e não
+  // no painel dele, porque recarregar e precificar são decisões de negócio.
+  { label: "Carteira", href: "/carteira", disabled: false },
   { label: "Equipe", href: "/team", disabled: true },
   { label: "Uso", href: "/usage", disabled: true },
 ];

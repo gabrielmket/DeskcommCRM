@@ -142,4 +142,8 @@ export {
   GoogleLogo,
   MapPin,
   ArrowsOutSimple,
+  // carteira do cliente (crédito de disparo) — o barril não tinha NENHUM ícone
+  // de dinheiro, e reaproveitar ChartLineUp faria a linha de Créditos parecer
+  // um relatório.
+  Wallet,
 } from "@phosphor-icons/react/dist/ssr";
