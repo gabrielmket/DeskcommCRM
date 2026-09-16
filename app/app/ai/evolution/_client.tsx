@@ -581,11 +581,15 @@ function Conteudo({ payload }: { payload: NonNullable<ReturnType<typeof useEvolu
             valor={taxaDeAjuda(outcome.handoff_rate, t)}
             significa={t(SIGNIFICA_AJUDA)}
           />
-          <StatCard
-            rotulo={t("Custo da IA no período")}
-            valor={usd.format(outcome.cost_cents / 100)}
-            significa={t("O que você pagou aos provedores de IA para tudo isto acontecer.")}
-          />
+          {/* Custo só existe para quem paga o provedor: a rota devolve nulo para o
+              resto, e o card SOME em vez de exibir zero. Ver lib/ai/custo-e-da-plataforma.ts. */}
+          {outcome.cost_cents !== null ? (
+            <StatCard
+              rotulo={t("Custo da IA no período")}
+              valor={usd.format(outcome.cost_cents / 100)}
+              significa={t("O que você pagou aos provedores de IA para tudo isto acontecer.")}
+            />
+          ) : null}
         </div>
       </Bloco>
 

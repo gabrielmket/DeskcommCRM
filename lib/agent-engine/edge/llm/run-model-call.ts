@@ -36,6 +36,7 @@ import {
   SQL_ORCAMENTO,
   type ChaveDeOrcamento,
 } from './orcamento';
+import { custoPelaTarifa, tarifaDoCatalogo } from './preco-do-catalogo';
 import { costCents } from './pricing';
 import { createDefaultRegistry, type ProviderRegistry } from './providers';
 import { buildStablePrefix } from './stable-prefix';
@@ -473,7 +474,12 @@ export async function runModelCall(db: pg.Pool, cfg: LlmEdgeConfig, input: RunMo
     cacheReadTokens: result.usage.inputTokenDetails.cacheReadTokens ?? 0,
     cacheWriteTokens: result.usage.inputTokenDetails.cacheWriteTokens ?? 0,
   };
-  const cost = costCents(model, usage);
+  // Tabela fixa primeiro (tem as tarifas de cache exatas dos Claude); o catálogo
+  // do banco cobre todo o resto que a tela oferece — sem ele, o modelo padrão de
+  // OpenAI gravava custo NULO e o teto mensal não vinculava ninguém.
+  const daTabelaFixa = costCents(model, usage);
+  const tarifa = daTabelaFixa === null ? await tarifaDoCatalogo(db, model) : null;
+  const cost = daTabelaFixa ?? (tarifa ? custoPelaTarifa(tarifa, usage) : null);
 
   const { rows } = await db.query<{ id: string }>(
     `insert into llm_calls

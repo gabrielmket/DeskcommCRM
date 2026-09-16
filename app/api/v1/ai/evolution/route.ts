@@ -21,6 +21,7 @@ import { z } from "zod";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { podeVerCusto } from "@/lib/ai/custo-e-da-plataforma";
 import { createClient } from "@/lib/supabase/server";
 import { aggregateEvolution, type EvolutionInput } from "@/lib/ai/evolution/aggregate";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -234,7 +235,11 @@ export async function GET(req: NextRequest): Promise<Response> {
     // ⚠️ COERÇÃO OBRIGATÓRIA. `cost_cents` é `numeric`, e o agregador repassa este
     // total sem tocar nele. Se uma linha vier como string, `acc + '12.5'` concatena
     // em silêncio e o card mostra texto (ou NaN) — nunca um erro.
-    costCents: llmCalls.reduce((acc, c) => acc + Number(c.cost_cents ?? 0), 0),
+    // Só a plataforma vê dinheiro (lib/ai/custo-e-da-plataforma.ts); para o
+    // cliente o card de custo some, em vez de mostrar R$ 0,00 — que seria falso.
+    costCents: podeVerCusto(authz.user)
+      ? llmCalls.reduce((acc, c) => acc + Number(c.cost_cents ?? 0), 0)
+      : null,
     inboundCount,
     handoffCount: handoffInbox + handoffEvents,
     pipelines: [...porPipeline.entries()].map(([name, hints]) => ({ name, hints })),

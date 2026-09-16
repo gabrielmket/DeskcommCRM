@@ -47,8 +47,19 @@ describe("CommandPalette", () => {
   it("ignora acento, porque ninguém digita acento com pressa", async () => {
     const user = userEvent.setup();
     abrir();
+    // Era "orcamento" → "Uso e orçamento". Neste fork esse destino é só da
+    // plataforma (custo de IA não é número do cliente — ver
+    // lib/ai/custo-e-da-plataforma.ts), e a sessão deste arquivo é de tenant.
+    // O caso continua medindo a MESMA coisa: acento digitado sem acento.
+    await user.type(screen.getByRole("combobox"), "execucoes");
+    expect(screen.getByRole("option", { name: /Execuções/ })).toBeTruthy();
+  });
+
+  it("o destino de custo não aparece para quem é só do tenant", async () => {
+    const user = userEvent.setup();
+    abrir();
     await user.type(screen.getByRole("combobox"), "orcamento");
-    expect(screen.getByRole("option", { name: /Uso e orçamento/ })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /Uso e orçamento/ })).toBeNull();
   });
 
   it("busca também na descrição, não só no rótulo", async () => {

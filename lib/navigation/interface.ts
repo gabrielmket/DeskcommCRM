@@ -40,10 +40,13 @@ export function essencial(d: NavMetadata, role: Role | null, platform = false): 
   );
 }
 export function canSee(
-  d: Pick<NavMetadata, "href" | "minRole">,
+  d: Pick<NavMetadata, "href" | "minRole" | "somentePlataforma">,
   platform: boolean,
   role: Role | null,
 ): boolean {
+  // Destino de plataforma não tem papel de tenant que alcance: o admin do
+  // cliente é o dono do negócio dele, não da operação da plataforma.
+  if (d.somentePlataforma) return platform;
   return platform || (!!role && ROLE_RANK[role] >= ROLE_RANK[d.minRole ?? "viewer"]);
 }
 export function permitidos(platform: boolean, role: Role | null): NavMetadata[] {

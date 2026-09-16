@@ -13,6 +13,7 @@ import type { NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { podeVerCusto, semCusto } from "@/lib/ai/custo-e-da-plataforma";
 import { PONTO_POR_ID } from "@/lib/ai/pontos/registro";
 import { EXPLICACAO_DA_ORIGEM, type OrigemDaEscolha } from "@/lib/ai/pontos/resolver";
 import { createClient } from "@/lib/supabase/server";
@@ -128,7 +129,10 @@ export async function GET(req: NextRequest): Promise<Response> {
   for (const e of erros) porCodigo.set(e.error_code ?? "?", (porCodigo.get(e.error_code ?? "?") ?? 0) + 1);
 
   return ok({
-    execucoes,
+    // O dinheiro sai da resposta quando quem pede não é da plataforma — a tela
+    // já esconde a linha de custo quando ela é nula, então o cliente continua
+    // vendo tokens, tempo e erro, que é o que diagnostica o atendimento dele.
+    execucoes: semCusto(execucoes, podeVerCusto(authz.user)),
     resumo: {
       total: execucoes.length,
       erros: erros.length,

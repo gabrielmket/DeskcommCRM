@@ -34,6 +34,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { podeVerCusto } from "@/lib/ai/custo-e-da-plataforma";
 import { getBudgetStatus, type BudgetStatus } from "@/lib/ai/budget/check";
 import {
   PISO_DE_TETO_CENTS,
@@ -91,6 +92,16 @@ export async function GET(_req: NextRequest): Promise<Response> {
   const authz = await requireRole("manager", { requestId, resource: "ai_budget" });
   if (!authz.ok) return authz.response;
   const { org: activeOrg } = authz;
+  // Teto de gasto é dinheiro, e dinheiro é da plataforma nesta instalação
+  // (`lib/ai/custo-e-da-plataforma.ts`): quem paga o provedor é quem opera.
+  if (!podeVerCusto(authz.user)) {
+    return fail(
+      "forbidden",
+      traduzir("O consumo de IA é acompanhado pela administração da plataforma.", authz.user.idioma),
+      403,
+      { requestId },
+    );
+  }
 
   const status = await getBudgetStatus(activeOrg.orgId);
   return ok(status, { requestId });
@@ -105,6 +116,13 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;
+  // Quem não vê o gasto não arma o teto dele: a escada off → avisar → bloquear
+  // decide se a IA PARA, e essa decisão é de quem paga a conta do provedor.
+  if (!podeVerCusto(authUser)) {
+    return fail("forbidden", t("O consumo de IA é acompanhado pela administração da plataforma."), 403, {
+      requestId,
+    });
+  }
 
   let body: unknown;
   try {

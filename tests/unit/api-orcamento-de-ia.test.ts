@@ -40,13 +40,19 @@ const ADMIN = "11111111-1111-4111-8111-111111111111";
 
 const H72_MS = 72 * 60 * 60 * 1000;
 
-function sessao(papel: Role) {
+/**
+ * FORK (Time Company, 15/09/2026): dinheiro de IA é número da PLATAFORMA — ver
+ * `lib/ai/custo-e-da-plataforma.ts`. A rota passou a exigir vínculo de
+ * plataforma além do papel no tenant, então a sessão destes casos é de quem
+ * opera a plataforma. O caso "admin do tenant leva 403" está logo abaixo.
+ */
+function sessao(papel: Role, plataforma = true) {
   const user: AuthUser = {
     id: ADMIN,
     email: "admin@example.com",
     full_name: "Admin",
     avatar_url: null,
-    is_platform_admin: false,
+    is_platform_admin: plataforma,
     idioma: "pt-BR" as const,
     organizations: [{ organization_id: ORG, organization_name: "Org", role: papel }],
   };
@@ -160,6 +166,19 @@ describe("PATCH /api/v1/ai/budget", () => {
         expect(res.status).toBe(403);
       });
     }
+
+    it("admin do CLIENTE também recebe 403 — o teto é decisão de quem paga o provedor", async () => {
+      // A regra deste fork: gasto de IA é da plataforma. Sem esta linha, o dono
+      // da organização escolheria quando a própria IA para de responder — e
+      // veria, no valor do teto, quanto o atendimento dele custa a nós.
+      sessao("admin", false);
+      const { cliente } = fazerAdmin({ linha: null });
+      vi.mocked(createAdminClient).mockReturnValue(
+        cliente as unknown as ReturnType<typeof createAdminClient>,
+      );
+      const res = await patch({ monthly_limit_cents: 10_000 });
+      expect(res.status).toBe(403);
+    });
   });
 
   describe("a escada — a fase de aviso não é pulável", () => {

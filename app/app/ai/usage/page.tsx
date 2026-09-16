@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { podeVerCusto } from "@/lib/ai/custo-e-da-plataforma";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { createClient } from "@/lib/supabase/server";
 import { BudgetCard } from "@/components/ai/BudgetCard";
@@ -24,6 +25,13 @@ export default async function AiUsagePage({ searchParams }: PageProps) {
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
   if (ROLE_RANK[activeOrg.role] < ROLE_RANK.manager) {
+    redirect("/403");
+  }
+  // Custo de IA é número da plataforma nesta instalação: quem paga o provedor é
+  // quem opera, e o cliente contrata atendimento e não tokens. O menu já esconde
+  // o destino; isto aqui é a autorização (menu não é gate). A rota que alimenta a
+  // tela recusa igual — ver `lib/ai/custo-e-da-plataforma.ts`.
+  if (!podeVerCusto(user)) {
     redirect("/403");
   }
 

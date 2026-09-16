@@ -31,7 +31,9 @@ export interface EvolutionInput {
     threshold: number;
   }>;
   stageTransitions: Array<{ created_at: string; to_stage: string }>;
-  costCents: number;
+  /** Nulo quando quem pede não é da plataforma: dinheiro não é número do cliente
+   *  nesta instalação (lib/ai/custo-e-da-plataforma.ts). */
+  costCents: number | null;
   inboundCount: number;
   handoffCount: number;
   pipelines: Array<{ name: string; hints: Array<string | null> }>;
@@ -65,7 +67,8 @@ export interface EvolutionPayload {
     won: number;
     lost: number;
     handoff_rate: number;
-    cost_cents: number;
+    /** Nulo = não visível para quem pediu (não é zero: zero seria mentira). */
+    cost_cents: number | null;
     /**
      * Mensagens recebidas de clientes na janela — o denominador de `handoff_rate`,
      * e o único campo do payload que responde "houve atendimento?".

@@ -16,6 +16,7 @@ import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { podeVerCusto } from "@/lib/ai/custo-e-da-plataforma";
 import { createClient } from "@/lib/supabase/server";
 import { aggregateUsage, type InvocationRow } from "@/lib/ai/usage/aggregate";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -66,6 +67,14 @@ export async function GET(req: NextRequest): Promise<Response> {
   const authz = await requireRole("manager", { requestId, resource: "ai_usage" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
+  // Nesta instalação o custo da IA é número da plataforma: ver
+  // `lib/ai/custo-e-da-plataforma.ts`. Esta rota é o painel de gasto inteiro —
+  // não há o que devolver ao cliente com o dinheiro removido.
+  if (!podeVerCusto(authz.user)) {
+    return fail("forbidden", t("O consumo de IA é acompanhado pela administração da plataforma."), 403, {
+      requestId,
+    });
+  }
   const { org: activeOrg } = authz;
 
   const parsed = querySchema.safeParse(

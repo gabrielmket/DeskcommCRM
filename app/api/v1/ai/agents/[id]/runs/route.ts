@@ -45,6 +45,7 @@ import { type NextRequest } from "next/server";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { podeVerCusto, semCusto } from "@/lib/ai/custo-e-da-plataforma";
 import { createClient } from "@/lib/supabase/server";
 import { runsListQuerySchema } from "@/lib/ai/agents/validation";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -208,7 +209,8 @@ export async function GET(req: NextRequest, ctx: Ctx): Promise<Response> {
       ? encodeCursor({ started_at: last.started_at as string, id: last.id as string })
       : null;
 
-  return ok(slice, {
+  // Dinheiro é da plataforma nesta instalação (lib/ai/custo-e-da-plataforma.ts).
+  return ok(semCusto(slice, podeVerCusto(authz.user)), {
     requestId,
     meta: { cursor: nextCursor, has_more: hasMore },
   });

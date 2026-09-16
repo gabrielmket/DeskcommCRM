@@ -35,7 +35,10 @@ const TELAS = [
   { rota: "/app/ai/knowledge/sources", nome: "acervo-de-conhecimento", dono: "W5" },
   { rota: "/app/ai/skills", nome: "habilidades", dono: "W5" },
   { rota: "/app/ai/memory", nome: "memoria-da-organizacao", dono: "W5" },
-  { rota: "/app/ai/usage", nome: "consumo", dono: "W1" },
+  // `/app/ai/usage` saiu desta lista neste fork: a tela de custo passou a ser
+  // SÓ da plataforma (lib/ai/custo-e-da-plataforma.ts), e o usuário deste arquivo
+  // é admin de tenant puro, por precondição. É exatamente o acréscimo que o
+  // comentário do beforeAll previa — uma tela exclusiva do dono na lista.
   { rota: "/app/ai/inbox", nome: "caixa-do-humano", dono: "W3" },
   { rota: "/app/ai/routers", nome: "roteadores", dono: "W3" },
   { rota: "/app/ai/agents/new", nome: "criar-agente", dono: "W1" },

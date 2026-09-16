@@ -161,50 +161,25 @@ test.describe("Criar um agente pela tela", () => {
 });
 
 test.describe("Olhar o consumo de IA", () => {
-  test("a tela mostra os números do período e nomeia o que eles são", async ({ page }) => {
+  /**
+   * NESTE FORK a tela de consumo é da PLATAFORMA, não do cliente: quem paga o
+   * provedor é quem opera, e o valor ali é o preço de custo do atendimento que o
+   * cliente compra (lib/ai/custo-e-da-plataforma.ts). O usuário deste arquivo é
+   * admin de TENANT — e é justamente ele que não pode chegar lá.
+   *
+   * O caso que sobrou mede a fronteira, que é o que passou a importar: o menu
+   * esconder não é gate, então o teste vai pela URL, que é como alguém chegaria.
+   */
+  test("admin do cliente não alcança a tela de custo, nem pela URL", async ({ page }) => {
     await page.goto("/app/ai/usage");
-    await expect(page.getByRole("heading", { name: /uso de ia/i })).toBeVisible();
+    await page.waitForLoadState("networkidle");
 
-    // Os quatro cartões do topo existem e trazem número, não traço.
-    for (const rotulo of [/custo no período/i, /atendimentos com ia/i]) {
-      await expect(page.getByText(rotulo).first()).toBeVisible();
-    }
-
-    // Nada de NaN/undefined vazando para a tela — o defeito clássico de
-    // dashboard quando a agregação recebe zero linhas.
-    const lixo = await page.evaluate(() =>
-      [...document.querySelectorAll("main *")]
-        .filter((el) => el.children.length === 0)
-        .map((el) => (el.textContent ?? "").trim())
-        .filter((t) => /\bNaN\b|\bundefined\b|\bInfinity\b|\[object/i.test(t)),
-    );
-    expect(lixo, `a tela mostrou valor inválido: ${JSON.stringify(lixo)}`).toEqual([]);
+    expect(page.url(), "a tela de custo abriu para um admin de tenant").not.toContain("/app/ai/usage");
+    const corpo = await page.locator("body").innerText();
+    expect(/custo no período/i.test(corpo), "o valor vazou na tela de recusa").toBe(false);
 
     await page.screenshot({
-      path: path.join(EVIDENCIA, "w1-uso-01-tela.png"),
-      fullPage: true,
-    });
-  });
-
-  test("um período sem nenhum dado é explicado, não fica em branco", async ({ page }) => {
-    await page.goto("/app/ai/usage");
-    await expect(page.getByRole("heading", { name: /uso de ia/i })).toBeVisible();
-
-    // Uma janela no passado onde não houve uso nenhum.
-    const de = page.locator('input[type="date"]').first();
-    const ate = page.locator('input[type="date"]').nth(1);
-    await de.fill("2020-01-01");
-    await ate.fill("2020-01-31");
-    await page.waitForTimeout(2500);
-
-    const corpo = await page.locator("main").innerText();
-    expect(
-      /sem dados|nenhum|0/i.test(corpo),
-      "período vazio não disse nada ao usuário",
-    ).toBe(true);
-
-    await page.screenshot({
-      path: path.join(EVIDENCIA, "w1-uso-02-periodo-vazio.png"),
+      path: path.join(EVIDENCIA, "w1-uso-01-recusa-ao-tenant.png"),
       fullPage: true,
     });
   });

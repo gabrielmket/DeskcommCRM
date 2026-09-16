@@ -40,6 +40,13 @@ export interface NavMetadata {
   section?: string;
   /** Ausente = viewer. Ver a regra de escolha abaixo. */
   minRole?: Role;
+  /**
+   * Só quem administra a PLATAFORMA enxerga, por mais alto que seja o papel no
+   * tenant. Não é um papel mais alto que `admin`: é outra natureza de dado —
+   * o que pertence a quem opera a plataforma, e não ao negócio do cliente.
+   * Hoje: o custo da IA (ver `lib/ai/custo-e-da-plataforma.ts`).
+   */
+  somentePlataforma?: boolean;
   /** Ausente = só no hub. `true` = uso diário, sobe para o sidebar. */
   sidebar?: boolean;
   healthDot?: boolean;
@@ -408,6 +415,10 @@ export const NAV_CATALOG = [
     group: "ia",
     section: "Acompanhar o agente",
     minRole: "manager",
+    // Custo é número de quem PAGA o provedor, e nesta instalação quem paga é a
+    // plataforma: o cliente contrata atendimento, não tokens. A rota e a página
+    // recusam do mesmo jeito — menu escondido nunca foi autorização.
+    somentePlataforma: true,
   },
 
   // ---- Canais — por onde as mensagens entram e saem ----

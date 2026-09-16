@@ -22,6 +22,7 @@ import { type NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { podeVerCusto } from "@/lib/ai/custo-e-da-plataforma";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { testRunSchema } from "@/lib/ai/agents/validation";
 import { avaliarRespostaDeTeste } from "@/lib/ai/agents/avaliar-resposta-de-teste";
@@ -163,5 +164,8 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
     metadata: { run_id: runRow.id, dry_run: true },
   });
 
+  // O ensaio também custa dinheiro, e dinheiro é da plataforma nesta instalação
+  // (lib/ai/custo-e-da-plataforma.ts): o painel de teste mostra "—" sem o valor.
+  if (!podeVerCusto(authz.user)) delete resultPayload.cost_cents;
   return ok(resultPayload, { requestId });
 }
