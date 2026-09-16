@@ -45,6 +45,15 @@ export interface Lead {
   value_cents: number | null;
   currency: string | null;
   owner_user_id: string | null;
+  /**
+   * Metas comerciais (0243). Quem ORIGINOU — o SDR que marcou a reunião —
+   * quando não é quem fecha; a participação dele sai daqui, e não de planilha.
+   */
+  originated_by_user_id?: string | null;
+  /** `recorrente` | `avulso`. NULL é "não classificado", e a tela declara isso. */
+  revenue_kind?: "recorrente" | "avulso" | null;
+  /** Meses de contrato: com a mensalidade, dá o valor total sem conta na mão. */
+  recurring_months?: number | null;
   /** 0070: quem é dono do negócio — humano, agente de IA, ou ninguém. */
   owner_kind: OwnerKind;
   /** 0070: identidade do agente dono (ai_agents.id), nunca a versão. */

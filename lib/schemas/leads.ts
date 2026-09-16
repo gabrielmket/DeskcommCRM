@@ -105,6 +105,20 @@ export const updateLeadSchema = z.object({
     .optional(),
   tags: z.array(z.string()).optional(),
   custom_fields: z.record(z.string(), z.unknown()).optional(),
+  /**
+   * Quem ORIGINOU (o SDR que marcou a reunião), quando não é quem fecha. É o
+   * que faz a participação dele sair do mesmo lugar em que a venda é
+   * registrada, em vez de uma planilha paralela no fim do mês (migration 0243).
+   */
+  originated_by_user_id: z.string().uuid().nullable().optional(),
+  /**
+   * `recorrente` (mensalidade) ou `avulso` (projeto, setup, venda única).
+   * Nulo é estado legítimo: a tela DIZ quantas vendas ficaram sem classificar,
+   * em vez de empurrá-las para um lado e inventar a divisão do relatório.
+   */
+  revenue_kind: z.enum(["recorrente", "avulso"]).nullable().optional(),
+  /** Duração do contrato, em meses. Com ela a mensalidade vira valor de contrato. */
+  recurring_months: z.coerce.number().int().min(1).max(120).nullable().optional(),
 });
 export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;
 

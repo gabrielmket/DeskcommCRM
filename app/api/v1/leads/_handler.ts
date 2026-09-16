@@ -426,6 +426,14 @@ export async function updateLeadHandler(
     patch.expected_close_date = input.expected_close_date;
   }
   if (input.tags !== undefined) patch.tags = input.tags;
+  // Metas comerciais (0243): quem originou e que tipo de receita é. Entram como
+  // qualquer outro campo — o que os torna especiais é o relatório que os lê, não
+  // a gravação.
+  if (input.originated_by_user_id !== undefined) {
+    patch.originated_by_user_id = input.originated_by_user_id;
+  }
+  if (input.revenue_kind !== undefined) patch.revenue_kind = input.revenue_kind;
+  if (input.recurring_months !== undefined) patch.recurring_months = input.recurring_months;
   if (input.custom_fields !== undefined) {
     const prev =
       existing.custom_fields && typeof existing.custom_fields === "object" && !Array.isArray(existing.custom_fields)
