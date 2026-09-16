@@ -2940,6 +2940,7 @@ export const DICIONARIO: Traducoes = {
     es: "evaluación del agente, ensayos e indexación",
   },
   "Por conversa": { es: "Por conversación" },
+  "Total": { es: "Total" },
   "conversa(s) com gasto": { es: "conversación(es) con gasto" },
   "nenhuma conversa no período": { es: "ninguna conversación en el período" },
   "atendimento + operação": { es: "atención + operación" },
