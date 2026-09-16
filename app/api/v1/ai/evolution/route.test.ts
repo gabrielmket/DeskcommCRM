@@ -74,7 +74,14 @@ function fakeDb(
 beforeEach(() => {
   requireRole.mockReset();
   from.mockReset();
-  requireRole.mockResolvedValue({ ok: true, org: { orgId: 'org-1' }, user: { idioma: 'pt-BR' } });
+  // `is_platform_admin`: neste fork o CUSTO só sai para quem paga o provedor
+  // (lib/ai/custo-e-da-plataforma.ts). Os casos abaixo medem a soma, então a
+  // sessão padrão é a de plataforma; o caso do tenant tem o seu próprio.
+  requireRole.mockResolvedValue({
+    ok: true,
+    org: { orgId: 'org-1' },
+    user: { idioma: 'pt-BR', is_platform_admin: true, support: null },
+  });
   fakeDb();
 });
 
@@ -186,6 +193,21 @@ describe('GET /api/v1/ai/evolution', () => {
     const r = await GET(req('?from=2026-07-01&to=2026-07-03'));
     const body = await r.json();
     expect(body.data.outcome.cost_cents).toBe(42.75);
+  });
+
+  it('para o cliente o custo volta NULO — o card some, em vez de mostrar zero', async () => {
+    // Zero seria a mentira que o fork foi consertar ("a IA não custou nada").
+    requireRole.mockResolvedValue({
+      ok: true,
+      org: { orgId: 'org-1' },
+      user: { idioma: 'pt-BR', is_platform_admin: false, support: null },
+    });
+    fakeDb({ llm_calls: [{ cost_cents: '12.5' }, { cost_cents: '30.25' }] });
+    const r = await GET(req('?from=2026-07-01&to=2026-07-03'));
+    const body = await r.json();
+    expect(body.data.outcome.cost_cents).toBeNull();
+    // O resto do painel continua inteiro: só o dinheiro sai.
+    expect(body.data.outcome.messages_received).toBeDefined();
   });
 
   it('deriva a taxa de handoff da contagem, não do tamanho da página lida', async () => {
