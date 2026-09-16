@@ -12,6 +12,7 @@ import { type NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth/requirePlatformAdmin";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,9 @@ export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const bloqueioDeSuporte = await requireSupportWrite();
+  if (bloqueioDeSuporte) return bloqueioDeSuporte;
+
   const requestId = randomUUID();
 
   let ctx: Awaited<ReturnType<typeof requirePlatformAdmin>>;

@@ -12,6 +12,8 @@
  * produto não busca câmbio na internet, e inventar um faria o custo de um mês
  * fechado mudar sozinho a cada vez que a tela abrisse.
  */
+import { useT } from "@/hooks/i18n/useT";
+import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { formatCentsUSD } from "@/lib/money";
 import type { GastoSeparado } from "@/lib/ai/custo/natureza";
 
@@ -36,7 +38,7 @@ function Cartao({
   cotacao: Props["cotacao"];
 }) {
   return (
-    <div className="rounded-lg border p-4">
+    <div className="rounded-md border p-4">
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{titulo}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">
         {cents === null ? "—" : cotacao ? emReais(cents, cotacao.usd_brl) : formatCentsUSD(cents)}
@@ -50,54 +52,68 @@ function Cartao({
 }
 
 export function NaturezaDoGasto({ natureza, cotacao }: Props) {
+  const t = useT();
+  const tagDoIdioma = useTagDeIdioma();
   const { atendimentoCents, sistemaCents, totalCents, conversas, porConversaCents, semPreco } = natureza;
   const fatiaAtendimento = totalCents > 0 ? Math.round((atendimentoCents / totalCents) * 100) : 0;
 
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-medium">De onde vem o gasto de IA</h2>
+        <h2 className="text-sm font-medium">{t("De onde vem o gasto de IA")}</h2>
         {cotacao ? (
           <p className="text-xs text-muted-foreground">
-            Convertido a R$ {cotacao.usd_brl.toLocaleString("pt-BR", { minimumFractionDigits: 4 })}
+            {t("Convertido a")} R${" "}
+            {cotacao.usd_brl.toLocaleString(tagDoIdioma, { minimumFractionDigits: 4 })}
             {cotacao.cotado_em
-              ? ` · cotação de ${new Date(cotacao.cotado_em).toLocaleDateString("pt-BR")}`
+              ? ` · ${t("cotação de")} ${new Date(cotacao.cotado_em).toLocaleDateString(tagDoIdioma)}`
               : ""}
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Sem cotação registrada: valores em dólar.
+            {t("Sem cotação registrada: valores em dólar.")}
           </p>
         )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Cartao
-          titulo="Atendimento"
+          titulo={t("Atendimento")}
           cents={atendimentoCents}
-          detalhe={`${fatiaAtendimento}% do total · o que o cliente causou`}
+          detalhe={`${fatiaAtendimento}% ${t("do total · o que o cliente causou")}`}
           cotacao={cotacao}
         />
         <Cartao
-          titulo="Operação do sistema"
+          titulo={t("Operação do sistema")}
           cents={sistemaCents}
-          detalhe="avaliação do agente, ensaios e indexação"
+          detalhe={t("avaliação do agente, ensaios e indexação")}
           cotacao={cotacao}
         />
         <Cartao
-          titulo="Por conversa"
+          titulo={t("Por conversa")}
           cents={porConversaCents}
-          detalhe={conversas > 0 ? `${conversas} conversa(s) com gasto` : "nenhuma conversa no período"}
+          detalhe={
+            conversas > 0
+              ? `${conversas} ${t("conversa(s) com gasto")}`
+              : t("nenhuma conversa no período")
+          }
           cotacao={cotacao}
         />
-        <Cartao titulo="Total" cents={totalCents} detalhe="atendimento + operação" cotacao={cotacao} />
+        <Cartao
+          titulo={t("Total")}
+          cents={totalCents}
+          detalhe={t("atendimento + operação")}
+          cotacao={cotacao}
+        />
       </div>
 
       {semPreco > 0 ? (
         // A ressalva que impede ler um piso como se fosse a conta inteira.
         <p className="text-xs text-amber-600 dark:text-amber-500">
-          {semPreco} chamada(s) do período ainda sem preço conhecido — o modelo não está na tabela
-          de preços, então o total acima é um piso, não a conta fechada.
+          {semPreco}{" "}
+          {t(
+            "chamada(s) do período ainda sem preço conhecido — o modelo não está na tabela de preços, então o total acima é um piso, não a conta fechada.",
+          )}
         </p>
       ) : null}
     </section>

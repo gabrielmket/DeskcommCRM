@@ -16,6 +16,8 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
+import { useT } from "@/hooks/i18n/useT";
 import {
   useAiSaldo,
   useApagarLancamento,
@@ -24,23 +26,36 @@ import {
   type SaldoDoProvedor as Saldo,
 } from "@/hooks/useAiSaldo";
 
-function usd(v: number): string {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "USD" });
+/** O provedor cobra em dólar; o formato do NÚMERO segue o idioma de quem lê. */
+function usd(v: number, tag: string): string {
+  return v.toLocaleString(tag, { style: "currency", currency: "USD" });
 }
 
-function brl(v: number, taxa: number): string {
-  return (v * taxa).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+function brl(v: number, taxa: number, tag: string): string {
+  return (v * taxa).toLocaleString(tag, { style: "currency", currency: "BRL" });
 }
 
-function dia(iso: string): string {
-  return new Date(iso).toLocaleDateString("pt-BR");
+function dia(iso: string, tag: string): string {
+  return new Date(iso).toLocaleDateString(tag);
 }
 
-function Cartao({ titulo, valor, detalhe, alerta }: { titulo: string; valor: string; detalhe: string; alerta?: boolean }) {
+function Cartao({
+  titulo,
+  valor,
+  detalhe,
+  alerta,
+}: {
+  titulo: string;
+  valor: string;
+  detalhe: string;
+  alerta?: boolean;
+}) {
   return (
-    <div className={`rounded-lg border p-4 ${alerta ? "border-amber-500/60" : ""}`}>
+    <div className={`rounded-md border p-4 ${alerta ? "border-amber-500/60" : ""}`}>
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{titulo}</p>
-      <p className={`mt-1 text-2xl font-semibold tabular-nums ${alerta ? "text-amber-600 dark:text-amber-500" : ""}`}>
+      <p
+        className={`mt-1 text-2xl font-semibold tabular-nums ${alerta ? "text-amber-600 dark:text-amber-500" : ""}`}
+      >
         {valor}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">{detalhe}</p>
@@ -49,43 +64,51 @@ function Cartao({ titulo, valor, detalhe, alerta }: { titulo: string; valor: str
 }
 
 function Cartoes({ s }: { s: Saldo }) {
+  const t = useT();
+  const tag = useTagDeIdioma();
   const taxa = s.cotacao?.usd_brl ?? null;
+  // Uma semana é o aviso que ainda dá tempo de agir sem correria.
   const acabaCedo = s.dias_restantes !== null && s.dias_restantes <= 7;
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Cartao
-        titulo="Saldo estimado"
-        valor={s.saldo_usd === null ? "—" : usd(s.saldo_usd)}
+        titulo={t("Saldo estimado")}
+        valor={s.saldo_usd === null ? "—" : usd(s.saldo_usd, tag)}
         detalhe={
           s.saldo_usd === null
-            ? "registre uma leitura de saldo para começar"
+            ? t("registre uma leitura de saldo para começar")
             : taxa
-              ? `${brl(s.saldo_usd, taxa)} na cotação registrada`
-              : "conta do provedor"
+              ? `${brl(s.saldo_usd, taxa, tag)} · ${t("na cotação registrada")}`
+              : t("conta do provedor")
         }
         alerta={acabaCedo}
       />
       <Cartao
-        titulo="Última leitura"
-        valor={s.leitura ? usd(s.leitura.amount_usd) : "—"}
-        detalhe={s.leitura ? `conferida em ${dia(s.leitura.occurred_at)}` : "nenhuma leitura registrada"}
-      />
-      <Cartao
-        titulo="Consumido desde então"
-        valor={usd(s.consumo_desde_leitura_usd)}
+        titulo={t("Última leitura")}
+        valor={s.leitura ? usd(s.leitura.amount_usd, tag) : "—"}
         detalhe={
-          s.recargas_desde_leitura_usd > 0
-            ? `${usd(s.recargas_desde_leitura_usd)} recarregados depois`
-            : "medido pelas chamadas do período"
+          s.leitura
+            ? `${t("conferida em")} ${dia(s.leitura.occurred_at, tag)}`
+            : t("nenhuma leitura registrada")
         }
       />
       <Cartao
-        titulo="Dura até"
-        valor={s.dura_ate ? dia(s.dura_ate) : "—"}
+        titulo={t("Consumido desde então")}
+        valor={usd(s.consumo_desde_leitura_usd, tag)}
+        detalhe={
+          s.recargas_desde_leitura_usd > 0
+            ? `${usd(s.recargas_desde_leitura_usd, tag)} ${t("recarregados depois")}`
+            : t("medido pelas chamadas do período")
+        }
+      />
+      <Cartao
+        titulo={t("Dura até")}
+        valor={s.dura_ate ? dia(s.dura_ate, tag) : "—"}
         detalhe={
           s.dias_restantes === null
-            ? "sem ritmo medido nos últimos 30 dias"
-            : `${usd(s.media_diaria_usd)}/dia · ${Math.floor(s.dias_restantes)} dia(s)`
+            ? t("sem ritmo medido nos últimos 30 dias")
+            : `${usd(s.media_diaria_usd, tag)}/${t("dia")} · ${Math.floor(s.dias_restantes)} ${t("dia(s)")}`
         }
         alerta={acabaCedo}
       />
@@ -94,6 +117,7 @@ function Cartoes({ s }: { s: Saldo }) {
 }
 
 function Formulario() {
+  const t = useT();
   const lancar = useLancarSaldo();
   const [tipo, setTipo] = useState<"recarga" | "leitura">("recarga");
   const [valor, setValor] = useState("");
@@ -105,7 +129,7 @@ function Formulario() {
 
   return (
     <form
-      className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
+      className="flex flex-wrap items-end gap-3 rounded-md border p-4"
       onSubmit={(e) => {
         e.preventDefault();
         if (!valido) return;
@@ -128,7 +152,7 @@ function Formulario() {
     >
       <div className="space-y-1">
         <label className="block text-xs text-muted-foreground" htmlFor="saldo-tipo">
-          Tipo
+          {t("Tipo")}
         </label>
         <select
           id="saldo-tipo"
@@ -136,13 +160,13 @@ function Formulario() {
           value={tipo}
           onChange={(e) => setTipo(e.target.value as "recarga" | "leitura")}
         >
-          <option value="recarga">Recarga (crédito que entrou)</option>
-          <option value="leitura">Leitura (saldo conferido na conta)</option>
+          <option value="recarga">{t("Recarga (crédito que entrou)")}</option>
+          <option value="leitura">{t("Leitura (saldo conferido na conta)")}</option>
         </select>
       </div>
       <div className="space-y-1">
         <label className="block text-xs text-muted-foreground" htmlFor="saldo-valor">
-          Valor em US$
+          {t("Valor em US$")}
         </label>
         <Input
           id="saldo-valor"
@@ -155,7 +179,7 @@ function Formulario() {
       </div>
       <div className="space-y-1">
         <label className="block text-xs text-muted-foreground" htmlFor="saldo-quando">
-          Quando (opcional)
+          {t("Quando (opcional)")}
         </label>
         {/* A DATA DO FATO, não a da digitação: recarga lançada dois dias depois
             precisa contar do dia certo, senão o saldo do intervalo sai errado. */}
@@ -169,26 +193,30 @@ function Formulario() {
       </div>
       <div className="min-w-[12rem] flex-1 space-y-1">
         <label className="block text-xs text-muted-foreground" htmlFor="saldo-nota">
-          Observação (opcional)
+          {t("Observação (opcional)")}
         </label>
         <Input
           id="saldo-nota"
-          placeholder="cartão da empresa"
+          placeholder={t("cartão da empresa")}
           value={nota}
           onChange={(e) => setNota(e.target.value)}
         />
       </div>
       <Button type="submit" disabled={!valido || lancar.isPending}>
-        {lancar.isPending ? "Registrando…" : "Registrar"}
+        {lancar.isPending ? t("Registrando…") : t("Registrar")}
       </Button>
       {lancar.isError ? (
-        <p className="w-full text-xs text-destructive">Não consegui registrar. Tente de novo.</p>
+        <p className="w-full text-xs text-destructive">
+          {t("Não consegui registrar. Tente de novo.")}
+        </p>
       ) : null}
     </form>
   );
 }
 
 function Cotacao({ atual }: { atual: { usd_brl: number; cotado_em: string | null } | null }) {
+  const t = useT();
+  const tag = useTagDeIdioma();
   const definir = useDefinirCotacao();
   const [valor, setValor] = useState("");
   const numero = Number(valor.replace(",", "."));
@@ -204,7 +232,7 @@ function Cotacao({ atual }: { atual: { usd_brl: number; cotado_em: string | null
     >
       <div className="space-y-1">
         <label className="block text-xs text-muted-foreground" htmlFor="cotacao">
-          Cotação do dólar
+          {t("Cotação do dólar")}
         </label>
         <Input
           id="cotacao"
@@ -216,57 +244,62 @@ function Cotacao({ atual }: { atual: { usd_brl: number; cotado_em: string | null
         />
       </div>
       <Button type="submit" variant="outline" disabled={!valido || definir.isPending}>
-        Atualizar
+        {t("Atualizar")}
       </Button>
       <p className="text-xs text-muted-foreground">
         {atual
-          ? `Em uso: R$ ${atual.usd_brl}${atual.cotado_em ? ` · de ${dia(atual.cotado_em)}` : ""}`
-          : "Sem cotação: os valores aparecem em dólar."}
+          ? `${t("Em uso:")} R$ ${atual.usd_brl}${atual.cotado_em ? ` · ${t("de")} ${dia(atual.cotado_em, tag)}` : ""}`
+          : t("Sem cotação: os valores aparecem em dólar.")}
       </p>
     </form>
   );
 }
 
 function Lancamentos({ linhas }: { linhas: Saldo["lancamentos"] }) {
+  const t = useT();
+  const tag = useTagDeIdioma();
   const apagar = useApagarLancamento();
+
   if (linhas.length === 0) {
     return (
-      <p className="rounded-lg border p-4 text-sm text-muted-foreground">
-        Nenhum lançamento ainda. Comece registrando uma leitura: o saldo que está hoje na conta do
-        provedor.
+      <p className="rounded-md border p-4 text-sm text-muted-foreground">
+        {t(
+          "Nenhum lançamento ainda. Comece registrando uma leitura: o saldo que está hoje na conta do provedor.",
+        )}
       </p>
     );
   }
+
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <div className="overflow-x-auto rounded-md border">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
           <tr>
-            <th className="px-3 py-2">Data</th>
-            <th className="px-3 py-2">Tipo</th>
-            <th className="px-3 py-2 text-right">Valor</th>
-            <th className="px-3 py-2">Observação</th>
+            <th className="px-3 py-2">{t("Data")}</th>
+            <th className="px-3 py-2">{t("Tipo")}</th>
+            <th className="px-3 py-2 text-right">{t("Valor")}</th>
+            <th className="px-3 py-2">{t("Observação")}</th>
             <th className="px-3 py-2" />
           </tr>
         </thead>
         <tbody>
           {linhas.map((l) => (
             <tr key={l.id} className="border-t">
-              <td className="px-3 py-2 tabular-nums">{dia(l.occurred_at)}</td>
+              <td className="px-3 py-2 tabular-nums">{dia(l.occurred_at, tag)}</td>
               <td className="px-3 py-2">
                 <span
-                  className={`rounded px-2 py-0.5 text-xs ${
+                  className={`rounded-md px-2 py-0.5 text-xs ${
                     l.tipo === "recarga"
                       ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                       : "bg-sky-500/10 text-sky-700 dark:text-sky-400"
                   }`}
                 >
-                  {l.tipo}
+                  {l.tipo === "recarga" ? t("recarga") : t("leitura")}
                 </span>
               </td>
               <td className="px-3 py-2 text-right tabular-nums">
                 {l.tipo === "recarga" ? "+" : ""}
-                {usd(l.amount_usd)}
+                {usd(l.amount_usd, tag)}
               </td>
               <td className="px-3 py-2 text-muted-foreground">{l.note ?? "—"}</td>
               <td className="px-3 py-2 text-right">
@@ -277,7 +310,7 @@ function Lancamentos({ linhas }: { linhas: Saldo["lancamentos"] }) {
                   disabled={apagar.isPending}
                   onClick={() => apagar.mutate(l.id)}
                 >
-                  Excluir
+                  {t("Excluir")}
                 </Button>
               </td>
             </tr>
@@ -289,24 +322,25 @@ function Lancamentos({ linhas }: { linhas: Saldo["lancamentos"] }) {
 }
 
 export function SaldoDoProvedorSecao() {
+  const t = useT();
   const { data, isLoading, isError } = useAiSaldo();
 
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-sm font-medium">Saldo e recarga do provedor</h2>
+        <h2 className="text-sm font-medium">{t("Saldo e recarga do provedor")}</h2>
         <p className="text-xs text-muted-foreground">
-          O saldo se atualiza sozinho: cai conforme os agentes trabalham e sobe quando você registra
-          uma recarga. Registre uma leitura sempre que conferir a conta do provedor — ela corrige
-          qualquer diferença acumulada.
+          {t(
+            "O saldo se atualiza sozinho: cai conforme os agentes trabalham e sobe quando você registra uma recarga. Registre uma leitura sempre que conferir a conta do provedor — ela corrige qualquer diferença acumulada.",
+          )}
         </p>
       </div>
 
       {isLoading ? (
-        <div className="h-24 animate-pulse rounded-lg border" />
+        <div className="h-24 animate-pulse rounded-md border" />
       ) : isError || !data ? (
-        <p className="rounded-lg border p-4 text-sm text-muted-foreground">
-          Não consegui ler o saldo agora.
+        <p className="rounded-md border p-4 text-sm text-muted-foreground">
+          {t("Não consegui ler o saldo agora.")}
         </p>
       ) : (
         <>

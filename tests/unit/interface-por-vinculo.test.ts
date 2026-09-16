@@ -16,8 +16,18 @@ const hrefs = (settings: unknown, role: "agent" | "admin" = "admin", platform = 
   destinosDaInterface(settings, platform, role).map((d) => d.href);
 describe("interface por vínculo é apresentação", () => {
   it("legado completa acompanha catálogo e não duplica IDs", () => {
-    expect(hrefs(null)).toEqual(NAV_CATALOG.map((d) => d.href));
+    // "Completa" é o catálogo inteiro MENOS o que pertence a quem opera a
+    // plataforma: neste fork o custo da IA é número de quem paga o provedor, e
+    // nenhum papel de tenant alcança esse destino (lib/ai/custo-e-da-plataforma.ts).
+    const doTenant = NAV_CATALOG.filter((d) => !("somentePlataforma" in d && d.somentePlataforma));
+    expect(hrefs(null)).toEqual(doTenant.map((d) => d.href));
     expect(new Set(NAV_CATALOG.map((d) => d.href)).size).toBe(NAV_CATALOG.length);
+  });
+
+  it("quem administra a plataforma vê o catálogo inteiro", () => {
+    // O outro lado da regra acima — sem este caso, marcar TODO destino como
+    // somentePlataforma deixaria o teste anterior verde com o menu vazio.
+    expect(hrefs(null, "admin", true)).toEqual(NAV_CATALOG.map((d) => d.href));
   });
   it("simplificada tem operação e Conexões somente quando papel permite", () => {
     expect(hrefs(simplified)).toContain("/app/connections");

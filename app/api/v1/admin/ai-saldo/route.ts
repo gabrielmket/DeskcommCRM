@@ -29,6 +29,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth/requirePlatformAdmin";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { derivarSaldo } from "@/lib/ai/custo/saldo";
 
@@ -152,6 +153,9 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const bloqueioDeSuporte = await requireSupportWrite();
+  if (bloqueioDeSuporte) return bloqueioDeSuporte;
+
   const requestId = randomUUID();
   const ctx = await exigirPlataforma();
   if (!ctx) return fail("forbidden", "Platform admin required", 403, { requestId });
@@ -199,6 +203,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const bloqueioDeSuporte = await requireSupportWrite();
+  if (bloqueioDeSuporte) return bloqueioDeSuporte;
+
   const requestId = randomUUID();
   const ctx = await exigirPlataforma();
   if (!ctx) return fail("forbidden", "Platform admin required", 403, { requestId });
