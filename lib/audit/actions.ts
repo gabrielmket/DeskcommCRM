@@ -156,6 +156,11 @@ export const AUDIT_ACTIONS = [
   "platform_admin.incident_viewed",
   "incident.resolved",
   "platform_admin.usage_viewed",
+  // Saldo do provedor de IA: são lançamentos de DINHEIRO, e quem confere a conta
+  // depois precisa saber o que foi lançado (ou apagado), por quem e quando.
+  "platform_admin.ai_saldo_lancado",
+  "platform_admin.ai_saldo_lancamento_apagado",
+  "platform_admin.ai_cotacao_definida",
   "platform_admin.users_listed",
   "platform_admin.user_viewed",
   "platform_admin.platform_admins_listed",
