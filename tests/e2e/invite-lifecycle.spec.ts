@@ -197,7 +197,7 @@ test.describe("ciclo de vida do convite (ponta a ponta + adversarial)", () => {
     // Sem membership ainda: o login não cai em /app. Esperamos a SESSÃO (cookie)
     // se firmar antes de ir ao accept_url — senão a página cai no estado não-logado.
     await expect
-      .poll(async () => (await inviteeCtx.cookies()).some((c) => c.name.startsWith("sb-deskcomm-auth")), {
+      .poll(async () => (await inviteeCtx.cookies()).some((c) => c.name.startsWith("sb-mia-auth")), {
         timeout: 40_000, // 1º login no dev (webpack) compila signInWithPassword — pode levar ~16s
       })
       .toBe(true);
@@ -500,7 +500,7 @@ test.describe("ciclo de vida do convite (ponta a ponta + adversarial)", () => {
     await expect
       .poll(
         async () =>
-          (await inviteeCtx.cookies()).some((c) => c.name.startsWith("sb-deskcomm-auth")),
+          (await inviteeCtx.cookies()).some((c) => c.name.startsWith("sb-mia-auth")),
         { timeout: 40_000 },
       )
       .toBe(true);

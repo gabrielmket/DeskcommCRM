@@ -16,6 +16,7 @@ import { z } from "zod";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { podeVerCusto } from "@/lib/ai/custo-e-da-plataforma";
 import { type Provider } from "@/lib/ai/provider-validators";
 import { guardarCredencial } from "@/lib/ai/credenciais/guardar";
 import { IDS_DE_PROVEDOR } from "@/lib/ai/pontos/provedores";
@@ -66,6 +67,14 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;
+  // Só a plataforma CRIA chave: a leitura (GET) segue liberada para manager+,
+  // porque o editor de agente precisa listar qual credencial usar — e a lista
+  // não traz segredo nenhum, só rótulo e os quatro últimos caracteres.
+  if (!podeVerCusto(authUser)) {
+    return fail("forbidden", t("A chave do provedor de IA é administrada pela plataforma."), 403, {
+      requestId,
+    });
+  }
 
   let rawBody: unknown;
   try {

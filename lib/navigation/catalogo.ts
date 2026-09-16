@@ -74,10 +74,10 @@ export interface NavMetadata {
  */
 export const NAV_GROUPS: NavGroup[] = [
   { id: "atendimento", label: "Atendimento" },
-  { id: "crm", label: "CRM", hub: { href: "/app/crm", label: "Ver tudo em CRM" } },
-  { id: "ia", label: "Agente de IA", hub: { href: "/app/ai", label: "Ver tudo em IA" } },
+  { id: "crm", label: "MIA CRM", hub: { href: "/app/crm", label: "Ver tudo no CRM" } },
+  { id: "ia", label: "Agente MIA", hub: { href: "/app/ai", label: "Ver tudo no agente" } },
   { id: "canais", label: "Canais" },
-  { id: "analise", label: "Análise", hub: { href: "/app/analise", label: "Ver tudo em Análise" } },
+  { id: "analise", label: "MIA Insights", hub: { href: "/app/analise", label: "Ver tudo no Insights" } },
   {
     id: "organizacao",
     label: "Organização",
@@ -320,6 +320,12 @@ export const NAV_CATALOG = [
     group: "ia",
     section: "Montar o agente",
     minRole: "manager",
+    // Credencial do PROVEDOR é do negócio que paga a conta, não do cliente: a
+    // regra desta instalação é "credencial do negócio vive no painel da
+    // plataforma; credencial do cliente, no painel dele" (o número de WhatsApp
+    // e a agenda do Google continuam sendo dele). Deixar a chave aqui permitiria
+    // ao cliente apontar para outra conta — ou apagar e derrubar o atendimento.
+    somentePlataforma: true,
   },
   {
     // O sistema chama modelo em 23 lugares e, até esta tela, a escolha vivia

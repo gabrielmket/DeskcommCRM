@@ -76,7 +76,7 @@ export function KPICards({ kpis }: KPICardsProps) {
         //
         // Quando o rótulo virar neutro de canal (Fase 3a, junto do seletor de
         // canal), ele passa a ter tradução de verdade e volta para `t()`.
-        label="Alertas WAHA"
+        label="Alertas MiaZap"
         value={kpis.waha_ban_alerts}
         subtitle={t("sessões com problema")}
         Icon={WifiSlash}

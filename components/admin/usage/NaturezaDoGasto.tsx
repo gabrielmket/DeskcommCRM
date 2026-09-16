@@ -29,8 +29,8 @@ interface Props {
   };
 }
 
-function emReais(cents: number, usdBrl: number): string {
-  return ((cents / 100) * usdBrl).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+function emReais(cents: number, usdBrl: number, tag: string): string {
+  return ((cents / 100) * usdBrl).toLocaleString(tag, { style: "currency", currency: "BRL" });
 }
 
 function Cartao({
@@ -38,17 +38,20 @@ function Cartao({
   cents,
   detalhe,
   cotacao,
+  tag,
 }: {
   titulo: string;
   cents: number | null;
   detalhe: string;
   cotacao: Props["cotacao"];
+  /** Idioma de quem lê: número também segue idioma, não só data. */
+  tag: string;
 }) {
   return (
     <div className="rounded-md border p-4">
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{titulo}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">
-        {cents === null ? "—" : cotacao ? emReais(cents, cotacao.usd_brl) : formatCentsUSD(cents)}
+        {cents === null ? "—" : cotacao ? emReais(cents, cotacao.usd_brl, tag) : formatCentsUSD(cents)}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
         {cents !== null && cotacao ? `${formatCentsUSD(cents)} · ` : ""}
@@ -89,12 +92,14 @@ export function NaturezaDoGasto({ natureza, cotacao, reais }: Props) {
           cents={atendimentoCents}
           detalhe={`${fatiaAtendimento}% ${t("do total · o que o cliente causou")}`}
           cotacao={cotacao}
+          tag={tagDoIdioma}
         />
         <Cartao
           titulo={t("Operação do sistema")}
           cents={sistemaCents}
           detalhe={t("avaliação do agente, ensaios e indexação")}
           cotacao={cotacao}
+          tag={tagDoIdioma}
         />
         <Cartao
           titulo={t("Por conversa")}
@@ -105,12 +110,14 @@ export function NaturezaDoGasto({ natureza, cotacao, reais }: Props) {
               : t("nenhuma conversa no período")
           }
           cotacao={cotacao}
+          tag={tagDoIdioma}
         />
         <Cartao
           titulo={t("Total")}
           cents={totalCents}
           detalhe={t("atendimento + operação")}
           cotacao={cotacao}
+          tag={tagDoIdioma}
         />
       </div>
 

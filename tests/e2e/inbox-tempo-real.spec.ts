@@ -27,7 +27,7 @@
  * Ele **não discrimina o conserto do token**. Medido, com Supabase local, build
  * de produção, revertendo SÓ `lib/supabase/browser.ts` para a versão da `main`
  * (e conferindo no bundle: `grep -rc realtime-token .next/static` → 0, com
- * controle positivo em `sb-deskcomm-auth` → 1):
+ * controle positivo em `sb-mia-auth` → 1):
  *
  *   com o conserto      → 1 passed
  *   sem o conserto      → 1 passed   ← aqui está o problema

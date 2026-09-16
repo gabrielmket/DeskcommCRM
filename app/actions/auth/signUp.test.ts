@@ -10,7 +10,7 @@
  * de cumprir, porque e-mail nenhum foi enviado.
  *
  * Medido na `origin/main` @ `4d50f63f`, com `GOTRUE_MAILER_AUTOCONFIRM=true`,
- * dirigindo a tela: o texto acima aparecia, o cookie de sessão `sb-deskcomm-auth`
+ * dirigindo a tela: o texto acima aparecia, o cookie de sessão `sb-mia-auth`
  * estava no browser, e `user_organizations` do usuário novo vinha `[]`. A pessoa
  * ficava esperando para sempre, autenticada e sem organização, sem motivo para
  * descobrir que a saída existe. Achado de @KIRAzinx566, com cliente real preso.

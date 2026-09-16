@@ -27,7 +27,7 @@ export type SignUpResult =
        *
        * Medido em 2026-09-05 na `origin/main` @ `4d50f63f`, com
        * `GOTRUE_MAILER_AUTOCONFIRM=true`: a tela dizia "Enviamos um link de
-       * confirmação para …", e ao mesmo tempo o cookie `sb-deskcomm-auth`
+       * confirmação para …", e ao mesmo tempo o cookie `sb-mia-auth`
        * estava no browser e `user_organizations` do usuário vinha `[]`.
        *
        * Achado de @KIRAzinx566, com um cliente real travado nessa tela.

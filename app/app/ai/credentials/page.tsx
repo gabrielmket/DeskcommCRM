@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { podeVerCusto } from "@/lib/ai/custo-e-da-plataforma";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { createClient } from "@/lib/supabase/server";
 import type { CredentialRow } from "@/hooks/ai/useCredentials";
@@ -19,6 +20,11 @@ export default async function CredentialsPage() {
   if (!activeOrg) redirect("/app");
   const idioma = user.idioma;
   if (ROLE_RANK[activeOrg.role] < ROLE_RANK.manager) {
+    redirect("/403");
+  }
+  // Credencial do provedor é do negócio que paga a conta de IA — e quem paga,
+  // nesta instalação, é a plataforma. O menu já esconde; isto é a autorização.
+  if (!podeVerCusto(user)) {
     redirect("/403");
   }
 

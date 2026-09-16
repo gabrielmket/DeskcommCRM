@@ -141,7 +141,7 @@ export function createClient() {
   _client = createBrowserClient(url, key, {
     // D-01.01: cookie name canônico alinhado ao middleware/server.
     cookieOptions: {
-      name: "sb-deskcomm-auth",
+      name: "sb-mia-auth",
       sameSite: "strict",
       path: "/",
     },

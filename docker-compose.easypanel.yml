@@ -1,4 +1,7 @@
-# DeskcommCRM no EasyPanel (serviço "Compose", fonte Git).
+# MIA no EasyPanel (serviço "Compose", fonte Git).
+#
+# Produto da Time Company, derivado do DeskcommCRM (MIT, Rafael Melgaço). O
+# código do autor continua creditado no LICENSE; o que o cliente vê é MIA.
 #
 # Por que um compose próprio, e não o docker-compose.prod.yml:
 #
@@ -42,7 +45,7 @@ services:
     # puxada de novo. Voltar ao autor: trocar o dono gabrielmket por melgarafael
     # e a tag por 1.21.0 (o endereço inteiro do autor não pode ser escrito aqui:
     # tests/unit/namespace-das-imagens.test.ts só o aceita nos arquivos âncora).
-    image: ${APP_IMAGE:-ghcr.io/gabrielmket/deskcommcrm:1.21.0-tc.6}
+    image: ${APP_IMAGE:-ghcr.io/gabrielmket/mia-crm:1.21.0-tc.6}
     pull_policy: missing
     restart: unless-stopped
     env_file: .env
@@ -63,7 +66,7 @@ services:
 
   worker:
     mem_limit: 512m
-    image: ${WORKER_IMAGE:-ghcr.io/gabrielmket/deskcomm-worker:1.21.0-tc.6}
+    image: ${WORKER_IMAGE:-ghcr.io/gabrielmket/mia-worker:1.21.0-tc.6}
     pull_policy: missing
     restart: unless-stopped
     env_file: .env
@@ -132,7 +135,7 @@ services:
     logging: *default-logging
 
   scheduler:
-    image: ${SCHEDULER_IMAGE:-ghcr.io/gabrielmket/deskcomm-scheduler:1.21.0-tc.6}
+    image: ${SCHEDULER_IMAGE:-ghcr.io/gabrielmket/mia-scheduler:1.21.0-tc.6}
     pull_policy: missing
     restart: unless-stopped
     depends_on:

@@ -174,6 +174,13 @@ const schema = z.object({
   // when AI_GATEWAY_API_KEY is absent, so production boot must not be fatal.
   AI_GATEWAY_API_KEY: z.string().optional().default(""),
   AI_GATEWAY_BASE_URL: z.string().optional().default(""),
+  // Chave de ADMINISTRAÇÃO da organização na OpenAI (`sk-admin-…`), que é outra
+  // coisa da chave usada pelos agentes: ela lê a FATURA
+  // (`/v1/organization/costs`). Serve para conferir o que este sistema mede
+  // contra o que a OpenAI cobra — sem ela o painel segue funcionando só com a
+  // medição própria, e o cron `gasto-openai` não faz nada. Somente leitura, e
+  // nunca sai do servidor. Ver `lib/ai/custo/openai-org.ts`.
+  OPENAI_ADMIN_KEY: z.string().optional().default(""),
   // OpenRouter: alternativa ao gateway da Vercel, compatível com a API da
   // OpenAI. Opcional — sem ela nada muda; com ela o chat passa a ser roteado
   // por lá. Ver resolveLanguageModel() em lib/ai/gateway.ts.

@@ -236,7 +236,7 @@ exposes:
 #### Decisões a registrar
 - Sub-domínio é `admin.deskcomm.com` em prod, `admin.localhost:3001` em dev (alias /etc/hosts)
 - Banner usa cor de acento `--sage-warn` (não vermelho — vermelho fica reservado pra suspended/critical)
-- Cookie de sessão é o mesmo `sb-deskcomm-auth` (compartilhado entre app e admin) — diferenciação é por flag `is_platform_admin`, não por cookie separado
+- Cookie de sessão é o mesmo `sb-mia-auth` (compartilhado entre app e admin) — diferenciação é por flag `is_platform_admin`, não por cookie separado
 
 #### Definition of Done
 - [ ] Todos os ACs passam em Playwright
@@ -701,7 +701,7 @@ exposes:
 ```
 
 #### Decisões a registrar
-- Cookie de impersonate é separado de `sb-deskcomm-auth`, nome `deskcomm-impersonate`, HMAC-SHA256 com `IMPERSONATE_COOKIE_SECRET`, expiry 1h, `httpOnly + secure + sameSite=lax`
+- Cookie de impersonate é separado de `sb-mia-auth`, nome `deskcomm-impersonate`, HMAC-SHA256 com `IMPERSONATE_COOKIE_SECRET`, expiry 1h, `httpOnly + secure + sameSite=lax`
 - Renovação: nova chamada explícita ao endpoint (não auto-renew, decisão de segurança)
 
 #### Definition of Done
@@ -1165,7 +1165,7 @@ Ao terminar o epic, a regression suite deve cobrir, no mínimo:
 ## 8. Decisões arquiteturais novas que este epic introduz
 
 - **ADR-EPIC-11-01**: Sub-domínio dedicado `admin.deskcomm.com` em vez de path `/admin` no host principal. Razão: isolamento de cookies, robots, possível Vercel password protection, separação clara de superfícies.
-- **ADR-EPIC-11-02**: Cookie de impersonate é separado do `sb-deskcomm-auth` (HMAC, expiry 1h, no auto-renew). Razão: auditabilidade explícita + fail-safe.
+- **ADR-EPIC-11-02**: Cookie de impersonate é separado do `sb-mia-auth` (HMAC, expiry 1h, no auto-renew). Razão: auditabilidade explícita + fail-safe.
 - **ADR-EPIC-11-03**: Mobile no `/admin` é deliberadamente read-only — composer e mutations escondidos < `md`. Razão: cross-tenant action em mobile é alto-risco; obriga uso em desktop.
 - **ADR-EPIC-11-04**: 3 canais realtime dedicados (`admin-inbox-{platform_admin_id}`, `tenant-health-{tenant_id}`, `alerts-platform`) em vez de subscribe de N `inbox-{org_id}`. Razão: escala e simplicidade de hooks no front; fanout via edge function server-side.
 - **ADR-EPIC-11-05**: `platform_admins` é write-only-via-DBA (T-04 reforçado). Página `/admin/platform-admins` é UI informativa; nenhuma rota API expõe mutation.

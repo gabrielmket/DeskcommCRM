@@ -16,7 +16,19 @@
  * runtime em vez de lida do bundle.
  */
 
-export const DEFAULT_APP_NAME = "DeskcommCRM";
+/**
+ * FORK (Time Company, 16/09/2026): o produto desta árvore é a MIA. O nome do
+ * autor sai daqui de propósito e de forma deliberada — é o que o gate de
+ * `tests/unit/marca-do-produto-nao-se-edita-no-codigo.test.ts` cobra: mudança
+ * de marca visível no diff, e não carona em dezenas de arquivos.
+ *
+ * O crédito ao trabalho de origem continua no LICENSE (MIT, Rafael Melgaço),
+ * que é onde ele pertence: no código-fonte, não na tela de quem usa.
+ *
+ * Isto é só o PADRÃO. Uma instalação continua podendo trocar nome, cor e logo
+ * por `/admin/marca` e pelo `.env` — ver docs/white-label.md.
+ */
+export const DEFAULT_APP_NAME = "MIA";
 
 export type Branding = {
   /** Nome exibido na interface e nos títulos de página. */

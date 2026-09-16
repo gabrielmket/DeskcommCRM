@@ -112,7 +112,7 @@ export function HealthGrid({ health }: HealthGridProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
       <HealthCard
-        title="WAHA"
+        title="MiaZap"
         status={waha.overall_status}
         icon={<WifiHigh size={18} aria-hidden />}
         primaryValue={wahaPrimary}
