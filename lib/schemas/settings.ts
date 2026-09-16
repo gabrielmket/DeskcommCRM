@@ -168,6 +168,15 @@ export const pipelineConfigPatchSchema = z.object({
     .optional(),
   fields: z.array(customFieldSchema).max(50).optional(),
   lost_reasons: z.array(z.string().min(1).max(80)).max(50).optional(),
+  /**
+   * Vencer NESTE funil significa dinheiro entrando?
+   *
+   * Ausente = sim, que é o certo para quem tem um funil só. Quem separa SDR de
+   * comercial marca `false` no do SDR: lá vencer é "reunião agendada", o card
+   * apenas passa adiante, e somar isso como receita anuncia faturamento que
+   * não entrou. Ver `lib/crm/metas/progresso.ts`.
+   */
+  vitoria_e_receita: z.boolean().optional(),
 });
 export type PipelineConfigPatch = z.infer<typeof pipelineConfigPatchSchema>;
 

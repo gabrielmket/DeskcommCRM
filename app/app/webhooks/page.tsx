@@ -6,7 +6,9 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { WebhooksClient } from "./_components/WebhooksClient";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Webhooks" };
+// O título acompanha o rótulo do menu (ver lib/navigation/catalogo.ts): a aba
+// mais usada desta tela é Automações, e o nome antigo escondia isso.
+export const metadata: Metadata = { title: "Automações" };
 
 export default async function WebhooksPage() {
   const user = await requireAuth();
@@ -18,7 +20,7 @@ export default async function WebhooksPage() {
   return (
     <div className="flex h-full flex-col gap-6 p-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Webhooks</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{traduzir("Automações", idioma)}</h1>
         <p className="text-sm text-muted-foreground">
           {traduzir(
             "Receba contatos de fora (landing pages, formulários) e crie automações que agem sozinhas.",

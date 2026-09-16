@@ -116,6 +116,11 @@ function PipelineEditor({ pipeline }: { pipeline: PipelineRow }) {
   const [lost, setLost] = useState(v.lost ?? "Perdido");
   const [reasonsText, setReasonsText] = useState(readLostReasons(pipeline.settings).join(", "));
   const [fields, setFields] = useState<CustomFieldDef[]>(camposDoFunil(pipeline.settings));
+  // Ausente = sim. Ver lib/crm/metas/progresso.ts: é o certo para quem tem um
+  // funil só, que é a maioria.
+  const [ehReceita, setEhReceita] = useState(
+    (pipeline.settings as { vitoria_e_receita?: boolean } | null)?.vitoria_e_receita !== false,
+  );
   const [isPending, startTransition] = useTransition();
 
   function handleSave() {
@@ -137,6 +142,7 @@ function PipelineEditor({ pipeline }: { pipeline: PipelineRow }) {
       vocabulary: { lead, deal, won, lost },
       fields: ok,
       lost_reasons: reasons,
+      vitoria_e_receita: ehReceita,
     };
     startTransition(async () => {
       const r = await updatePipelineConfig(pipeline.id, patch);
@@ -172,6 +178,25 @@ function PipelineEditor({ pipeline }: { pipeline: PipelineRow }) {
       <div className="space-y-1">
         <Label className="text-xs">{t("Motivos de perda (separados por vírgula)")}</Label>
         <Input value={reasonsText} onChange={(e) => setReasonsText(e.target.value)} />
+      </div>
+
+      {/* A pergunta que separa SDR de comercial. Fica junto do vocabulário
+          porque é da mesma natureza: o que "ganhar" SIGNIFICA neste funil. */}
+      <div className="space-y-1 rounded-md border border-border p-3">
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={ehReceita}
+            onChange={(e) => setEhReceita(e.target.checked)}
+          />
+          <span>
+            {t("Ganhar neste funil é receita")}
+            <span className="block text-xs text-muted-foreground">
+              {t("Desmarque no funil do SDR, onde ganhar é 'reunião agendada' e o card só passa adiante: somar isso no relatório anuncia faturamento que ainda não entrou.")}
+            </span>
+          </span>
+        </label>
       </div>
 
       <div className="space-y-2">

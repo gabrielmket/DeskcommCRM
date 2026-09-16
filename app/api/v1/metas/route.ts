@@ -20,6 +20,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import {
   progressoDaMeta,
+  resumoDasReunioes,
   resumoDoMes,
   type LeadFechadoComPrazo,
   type Meta,
@@ -38,6 +39,7 @@ const criarSchema = z.object({
   periodo: z.string().regex(MES, "use AAAA-MM"),
   metrica: z.enum([
     "reunioes",
+    "reunioes_realizadas",
     "receita_total",
     "receita_recorrente",
     "receita_avulsa",
@@ -82,7 +84,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     db
       .from("crm_leads")
       .select(
-        "status, value_cents, revenue_kind, recurring_months, owner_user_id, originated_by_user_id, closed_at",
+        "status, value_cents, revenue_kind, recurring_months, owner_user_id, originated_by_user_id, closed_at, pipeline_id",
       )
       .eq("organization_id", org.orgId)
       .eq("status", "won")
@@ -100,6 +102,31 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   if (metasRes.error) return fail("query_failed", metasRes.error.message, 500, { requestId });
 
+  /**
+   * Em QUAIS funis vencer é receita.
+   *
+   * Sem nenhuma declaração, `null` — e aí tudo conta, que é o certo para quem
+   * tem um funil só. Basta UM funil declarar `vitoria_e_receita: false` para a
+   * régua passar a valer, e aí os outros precisam estar na lista: por isso o
+   * conjunto é montado com todos os que NÃO se declararam fora.
+   */
+  const { data: funis } = await db
+    .from("crm_pipelines")
+    .select("id, settings")
+    .eq("organization_id", org.orgId);
+  const declararam = (funis ?? []).some(
+    (f) => (f.settings as { vitoria_e_receita?: boolean } | null)?.vitoria_e_receita === false,
+  );
+  const funisDeReceita = declararam
+    ? new Set(
+        (funis ?? [])
+          .filter(
+            (f) => (f.settings as { vitoria_e_receita?: boolean } | null)?.vitoria_e_receita !== false,
+          )
+          .map((f) => f.id as string),
+      )
+    : null;
+
   const leads: LeadFechadoComPrazo[] = (leadsRes.data ?? []).map((l) => ({
     status: l.status as string,
     value_cents: l.value_cents === null ? null : Number(l.value_cents),
@@ -108,6 +135,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     owner_user_id: (l.owner_user_id as string | null) ?? null,
     originated_by_user_id: (l.originated_by_user_id as string | null) ?? null,
     closed_at: (l.closed_at as string | null) ?? null,
+    pipeline_id: l.pipeline_id as string,
   }));
 
   // Reunião CANCELADA não conta como marcada: a meta do SDR mede compromisso de
@@ -118,6 +146,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       marcada_por_user_id: (r.created_by_user_id as string | null) ?? null,
       marcada_por_agent_id: (r.created_by_agent_id as string | null) ?? null,
       created_at: r.created_at as string,
+      status: r.status as string,
     }));
 
   const metas = (metasRes.data ?? []) as unknown as Meta[];
@@ -125,8 +154,15 @@ export async function GET(req: NextRequest): Promise<Response> {
   return ok(
     {
       periodo,
-      metas: metas.map((m) => progressoDaMeta(m, leads, reunioes)),
-      resumo: resumoDoMes(leads, dia1),
+      metas: metas.map((m) => progressoDaMeta(m, leads, reunioes, funisDeReceita)),
+      resumo: resumoDoMes(leads, dia1, funisDeReceita),
+      // Marcar e comparecer são medidas diferentes. O desfecho já era gravado
+      // (a Agenda tem "Realizado"/"Faltou" e o agente registra sozinho) e não
+      // era somado em lugar nenhum.
+      reunioes: resumoDasReunioes(reunioes, dia1),
+      // A tela precisa poder dizer "receita só do comercial" em vez de deixar o
+      // número parecer o total da casa.
+      funis_que_contam_receita: funisDeReceita ? [...funisDeReceita] : null,
       reunioes_no_mes: reunioes.length,
     },
     { requestId },
@@ -160,7 +196,11 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   // As duas regras que o banco também cobra, repetidas aqui para a mensagem ser
   // legível: o CHECK devolveria 23514, que não diz nada a quem está na tela.
-  const ehAtividade = dados.metrica === "reunioes";
+  // Marcadas e realizadas se contam em UNIDADES; as de receita, em centavos.
+  // O CHECK do banco cobra o mesmo (0246) — aqui é só para a mensagem ser
+  // legível em vez de um 23514 cru na tela.
+  const ehAtividade =
+    dados.metrica === "reunioes" || dados.metrica === "reunioes_realizadas";
   if (ehAtividade && !dados.alvo_quantidade) {
     return fail("validation_failed", t("Meta de reuniões precisa de uma quantidade."), 422, {
       requestId,

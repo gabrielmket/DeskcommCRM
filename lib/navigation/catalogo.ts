@@ -469,8 +469,13 @@ export const NAV_CATALOG = [
   },
   {
     href: "/app/webhooks",
-    label: "Webhooks",
-    description: "Avise outros sistemas quando algo acontecer aqui dentro.",
+    // "Webhooks" era o nome de quando a tela SÓ recebia dados de fora. Hoje a
+    // aba mais usada dela é Automações — e o dono do produto abriu o menu
+    // procurando a regra de reunião marcada e não achou (16/09). Rótulo que
+    // esconde a função é rótulo errado, por mais correto que seja o termo.
+    label: "Automações",
+    description:
+      "Regras do tipo 'quando acontecer X, faça Y' — e a entrada de dados de outros sistemas.",
     icon: "WebhooksLogo",
     group: "canais",
     minRole: "manager",

@@ -61,6 +61,10 @@ export async function updatePipelineConfig(
   const nextSettings: Record<string, unknown> = { ...currentSettings };
   if (parsed.data.fields !== undefined) nextSettings.fields = parsed.data.fields;
   if (parsed.data.lost_reasons !== undefined) nextSettings.lost_reasons = parsed.data.lost_reasons;
+  // Ver `lib/crm/metas/progresso.ts`: ausente = vencer aqui é receita.
+  if (parsed.data.vitoria_e_receita !== undefined) {
+    nextSettings.vitoria_e_receita = parsed.data.vitoria_e_receita;
+  }
 
   const { error } = await supabase
     .from("crm_pipelines")

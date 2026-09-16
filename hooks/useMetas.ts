@@ -9,6 +9,15 @@ export interface PainelDeMetas {
   metas: ProgressoDaMeta[];
   resumo: ResumoDoMes;
   reunioes_no_mes: number;
+  /** Marcar e comparecer são medidas diferentes — ver lib/crm/metas/progresso.ts. */
+  reunioes: {
+    marcadas: number;
+    realizadas: number;
+    faltas: number;
+    sem_desfecho: number;
+    /** NULO enquanto nenhuma reunião tiver desfecho. Não é zero. */
+    taxa_de_comparecimento: number | null;
+  };
 }
 
 const CHAVE = (periodo: string) => ["metas", periodo] as const;

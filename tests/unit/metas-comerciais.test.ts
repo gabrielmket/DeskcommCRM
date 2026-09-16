@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import {
   progressoDaMeta,
   realizadoDaMeta,
+  resumoDasReunioes,
   resumoDoMes,
   type LeadFechadoComPrazo,
   type Meta,
@@ -27,6 +28,8 @@ import {
 const CLOSER = "11111111-1111-4111-8111-111111111111";
 const SDR = "22222222-2222-4222-8222-222222222222";
 const AGENTE = "33333333-3333-4333-8333-333333333333";
+const COMERCIAL = "44444444-4444-4444-8444-444444444444";
+const FUNIL_DO_SDR = "55555555-5555-4555-8555-555555555555";
 
 function venda(over: Partial<LeadFechadoComPrazo> = {}): LeadFechadoComPrazo {
   return {
@@ -35,6 +38,7 @@ function venda(over: Partial<LeadFechadoComPrazo> = {}): LeadFechadoComPrazo {
     revenue_kind: "recorrente",
     owner_user_id: CLOSER,
     originated_by_user_id: SDR,
+    pipeline_id: COMERCIAL,
     closed_at: "2026-09-10T12:00:00.000Z",
     recurring_months: null,
     ...over,
@@ -123,10 +127,10 @@ describe("a participação de quem originou", () => {
 
 describe("a meta de reunião — do SDR e do agente", () => {
   const reunioes: ReuniaoMarcada[] = [
-    { marcada_por_user_id: SDR, marcada_por_agent_id: null, created_at: "2026-09-02T10:00:00Z" },
-    { marcada_por_user_id: null, marcada_por_agent_id: AGENTE, created_at: "2026-09-03T10:00:00Z" },
-    { marcada_por_user_id: null, marcada_por_agent_id: AGENTE, created_at: "2026-09-04T10:00:00Z" },
-    { marcada_por_user_id: SDR, marcada_por_agent_id: null, created_at: "2026-08-30T10:00:00Z" },
+    { marcada_por_user_id: SDR, marcada_por_agent_id: null, created_at: "2026-09-02T10:00:00Z", status: "completed" },
+    { marcada_por_user_id: null, marcada_por_agent_id: AGENTE, created_at: "2026-09-03T10:00:00Z", status: "no_show" },
+    { marcada_por_user_id: null, marcada_por_agent_id: AGENTE, created_at: "2026-09-04T10:00:00Z", status: "confirmed" },
+    { marcada_por_user_id: SDR, marcada_por_agent_id: null, created_at: "2026-08-30T10:00:00Z", status: "completed" },
   ];
 
   it("conta as do SDR no mês", () => {
@@ -195,5 +199,118 @@ describe("o fechamento do mês", () => {
 
   it("mês sem venda devolve zeros, não NaN", () => {
     expect(resumoDoMes([], "2026-09-01")).toMatchObject({ total: 0, vendasSemClassificacao: 0 });
+  });
+});
+
+/**
+ * GANHAR NEM SEMPRE É RECEITA.
+ *
+ * O desenho da casa (declarado pelo dono em 16/09): o funil do SDR VENCE quando
+ * a reunião é agendada — o card passa ao comercial e o dinheiro ainda não
+ * existe. Contar esse ganho como receita anuncia faturamento que não entrou, e
+ * é justamente o número mais citado do relatório.
+ *
+ * A régua não pode ser adivinhada: numa casa com um funil só, ganhar É vender,
+ * e os dois casos usam o mesmo `is_won`. Por isso quem declara é o FUNIL, e a
+ * ausência de declaração mantém o comportamento de sempre.
+ */
+describe("receita conta só nos funis em que vencer é dinheiro", () => {
+  const noSdr = venda({ pipeline_id: FUNIL_DO_SDR, value_cents: 500_000 });
+  const noComercial = venda({ pipeline_id: COMERCIAL, value_cents: 300_000 });
+  const soComercial = new Set([COMERCIAL]);
+
+  it("sem declaração, tudo conta — quem tem um funil só não muda de comportamento", () => {
+    expect(realizadoDaMeta(meta(), [noSdr, noComercial], [])).toBe(800_000);
+  });
+
+  it("com o funil do SDR fora, só o comercial vira receita", () => {
+    expect(
+      realizadoDaMeta(meta(), [noSdr, noComercial], [], soComercial),
+      "a reunião agendada no funil do SDR entrou como receita: o relatório anuncia dinheiro que ainda não entrou",
+    ).toBe(300_000);
+  });
+
+  it("a participação do SDR também respeita a régua — senão ele receberia crédito pela própria reunião", () => {
+    const m = meta({ metrica: "receita_originada", user_id: SDR });
+    expect(
+      realizadoDaMeta(m, [noSdr, noComercial], [], soComercial),
+      "o ganho do próprio funil do SDR virou 'receita originada' por ele: crédito em cima de dinheiro que não existe",
+    ).toBe(300_000);
+  });
+
+  it("o RESUMO usa a mesma régua — dois totais do mesmo mês seria pior que um errado", () => {
+    expect(resumoDoMes([noSdr, noComercial], "2026-09-01", soComercial).total).toBe(300_000);
+  });
+
+  it("a meta de REUNIÕES não é filtrada por funil — senão a meta do SDR zeraria", () => {
+    const m = meta({ metrica: "reunioes", alvo_cents: null, alvo_quantidade: 10 });
+    const reunioes: ReuniaoMarcada[] = [
+      { marcada_por_user_id: SDR, marcada_por_agent_id: null, created_at: "2026-09-10T12:00:00.000Z", status: "confirmed" },
+    ];
+    expect(
+      realizadoDaMeta(m, [], reunioes, soComercial),
+      "filtrar reunião por funil de receita zeraria justamente a meta do SDR",
+    ).toBe(1);
+  });
+});
+
+/**
+ * MARCAR NÃO É COMPARECER.
+ *
+ * `reunioes` sozinha esconde os dois comportamentos opostos que importam: o SDR
+ * que marca bem e leva faltas do cliente, e o que marca com qualquer um para
+ * bater número e deixa a agenda do closer virar sala vazia. Com as duas
+ * métricas lado a lado, os dois aparecem.
+ *
+ * A falta NÃO é descontada de `reunioes`, e é decisão: descontar puniria o SDR
+ * pelo cliente que não apareceu.
+ */
+describe("reunião realizada é outra medida que reunião marcada", () => {
+  const agenda: ReuniaoMarcada[] = [
+    // Duas do SDR: uma aconteceu, uma o cliente faltou.
+    { marcada_por_user_id: SDR, marcada_por_agent_id: null, created_at: "2026-09-02T10:00:00Z", status: "completed" },
+    { marcada_por_user_id: SDR, marcada_por_agent_id: null, created_at: "2026-09-03T10:00:00Z", status: "no_show" },
+    // E uma que ainda vai acontecer.
+    { marcada_por_user_id: SDR, marcada_por_agent_id: null, created_at: "2026-09-20T10:00:00Z", status: "confirmed" },
+  ];
+
+  it("a falta NÃO é descontada das marcadas", () => {
+    const m = meta({ metrica: "reunioes", alvo_cents: null, alvo_quantidade: 10, user_id: SDR });
+    expect(
+      realizadoDaMeta(m, [], agenda),
+      "a falta do cliente foi descontada da meta do SDR: ele é punido por algo que não controla",
+    ).toBe(3);
+  });
+
+  it("realizadas conta só o que ACONTECEU", () => {
+    const m = meta({
+      metrica: "reunioes_realizadas",
+      alvo_cents: null,
+      alvo_quantidade: 10,
+      user_id: SDR,
+    });
+    expect(
+      realizadoDaMeta(m, [], agenda),
+      "entrou reunião que faltou ou que ainda nem aconteceu na conta de realizadas",
+    ).toBe(1);
+  });
+
+  it("a taxa de comparecimento ignora o que ainda não tem desfecho", () => {
+    const r = resumoDasReunioes(agenda, "2026-09-01");
+    expect(r.marcadas).toBe(3);
+    expect(r.realizadas).toBe(1);
+    expect(r.faltas).toBe(1);
+    expect(r.sem_desfecho, "a reunião de amanhã sumiu da contagem").toBe(1);
+    expect(
+      r.taxa_de_comparecimento,
+      "a reunião de amanhã entrou no denominador: a taxa despencaria só porque o mês não acabou",
+    ).toBe(0.5);
+  });
+
+  it("sem nenhum desfecho, a taxa é NULA — e não zero, que se leria como 'ninguém apareceu'", () => {
+    const soFuturas: ReuniaoMarcada[] = [
+      { marcada_por_user_id: SDR, marcada_por_agent_id: null, created_at: "2026-09-20T10:00:00Z", status: "confirmed" },
+    ];
+    expect(resumoDasReunioes(soFuturas, "2026-09-01").taxa_de_comparecimento).toBeNull();
   });
 });

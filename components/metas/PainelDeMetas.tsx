@@ -20,6 +20,7 @@ import type { ProgressoDaMeta } from "@/lib/crm/metas/progresso";
 
 const ROTULO: Record<ProgressoDaMeta["metrica"], string> = {
   reunioes: "Reuniões marcadas",
+  reunioes_realizadas: "Reuniões realizadas",
   receita_total: "Receita total",
   receita_recorrente: "Receita recorrente",
   receita_avulsa: "Receita avulsa",
@@ -150,7 +151,34 @@ export function PainelDeMetas() {
               <p className="text-xs uppercase tracking-wide text-muted-foreground">
                 {t("Reuniões marcadas")}
               </p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">{data.reunioes_no_mes}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums">{data.reunioes.marcadas}</p>
+              {/* Marcar e comparecer são medidas diferentes, e o número que
+                  falta aparecer é sempre o segundo: o dado do desfecho já era
+                  gravado pela Agenda e não era somado em lugar nenhum. */}
+              <p className="mt-1 text-xs text-muted-foreground">
+                {data.reunioes.realizadas} {t("realizadas")} · {data.reunioes.faltas}{" "}
+                {t("faltas")}
+                {data.reunioes.sem_desfecho > 0
+                  ? ` · ${data.reunioes.sem_desfecho} ${t("sem desfecho")}`
+                  : ""}
+              </p>
+            </div>
+            <div className="rounded-md border p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                {t("Comparecimento")}
+              </p>
+              <p className="mt-1 text-xl font-semibold tabular-nums">
+                {/* NULO não é zero: zero se leria como "ninguém apareceu", e o
+                    que houve foi nenhuma reunião ter chegado ao fim ainda. */}
+                {data.reunioes.taxa_de_comparecimento === null
+                  ? "—"
+                  : `${Math.round(data.reunioes.taxa_de_comparecimento * 100)}%`}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {data.reunioes.taxa_de_comparecimento === null
+                  ? t("Nenhuma reunião com desfecho ainda.")
+                  : t("Das reuniões que já aconteceram ou faltaram.")}
+              </p>
             </div>
           </div>
 
