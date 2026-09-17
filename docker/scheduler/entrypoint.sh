@@ -65,6 +65,11 @@ CRONS="
 */5 * * * *|25|api/v1/cron/storage-redaction?limit=50
 */5 * * * *|25|api/v1/cron/snooze-watcher
 */5 * * * *|25|api/v1/cron/attendant-heartbeat
+# O MOTOR DO MIA BROADCAST. A cada minuto porque o estado mora todo no banco
+# (uma linha por destinatário) e a rodada é curta de propósito: 50 mensagens e
+# volta. Rodada longa seguraria o processo e atrasaria a reconferência de saldo,
+# que é o que impede estourar o crédito do cliente.
+* * * * *|60|api/v1/cron/broadcast-worker
 */5 * * * *|60|api/v1/cron/webhook-log-retention
 */5 * * * *|45|api/v1/cron/channel-health
 */10 * * * *|60|api/v1/cron/contact-avatars
