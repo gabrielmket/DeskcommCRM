@@ -372,6 +372,51 @@ export async function alterarAgendamentoHandler(
       outcome: {revision:salvo.revision,source_kind:salvo.outcome_source_kind,message_id:salvo.outcome_message_id,recorded_at:salvo.outcome_recorded_at},
     });
 
+    /**
+     * A FALTA AVISA A RÉGUA DE RECUPERAÇÃO.
+     *
+     * A máquina inteira já existia — o handler `followup-gatilho-presenca.v1`
+     * está registrado, `fn_appointment_recover` está no banco, a tela de
+     * publicar fluxo cita o gatilho e o teste e2e o documenta — e NINGUÉM
+     * emitia `appointment.outcome_confirmed`. A única ocorrência do nome em
+     * todo o código era o próprio ouvinte.
+     *
+     * Efeito: marcar "Faltou" na Agenda gravava o desfecho, escrevia a
+     * auditoria, e o cliente que não apareceu nunca recebia a mensagem de
+     * recuperação. Sem erro em lugar nenhum — o fluxo simplesmente não rodava,
+     * e quem o configurou concluiria que o produto não cumpre o que a tela diz.
+     *
+     * ⚠️ `entity_kind` é `appointment`, e não `calendar_appointment`: é o que
+     * `fn_appointment_recover` filtra, e um valor diferente faz a função não
+     * achar o evento e responder `appointment_source_event_missing`.
+     *
+     * Só na FALTA. `completed` não entra: quem compareceu não precisa ser
+     * recuperado, e enrollar essa pessoa seria cobrar presença de quem esteve lá.
+     */
+    if (transicao === "no_show") {
+      await supabase
+        .rpc("emit_event", {
+          p_event_type: "appointment.outcome_confirmed",
+          p_entity_kind: "appointment",
+          p_entity_id: atual.id,
+          p_payload: { appointment_revision: salvo.revision, status: salvo.status },
+          p_metadata: { request_id: ctx.requestId },
+          p_organization_id: ctx.organization_id,
+        })
+        .then(({ error }) => {
+          // Fire-and-forget: o desfecho JÁ está gravado, e derrubar a marcação
+          // porque o aviso falhou trocaria um problema de recuperação por um de
+          // agenda. A função tem recibo por (compromisso, revisão), então
+          // reemitir depois não duplica nada.
+          if (error) {
+            logger.error("[agenda] emit_event appointment.outcome_confirmed falhou", {
+              appointment_id: atual.id,
+              error: error.message,
+            });
+          }
+        });
+    }
+
     void audit({action: transicao === "rescheduled" ? "agenda.appointment_rescheduled" : transicao === "completed" || transicao === "no_show" ? "agenda.appointment_outcome_recorded" : "agenda.appointment_updated",
       actorUserId:ctx.actor.type === "user" ? ctx.actor.id : null,organizationId:ctx.organization_id,
       resourceType:"calendar_appointment",resourceId:input.id,requestId:ctx.requestId,

@@ -520,3 +520,56 @@ describe("a agenda anuncia a reunião marcada", () => {
     ).toHaveLength(0);
   });
 });
+
+/**
+ * A FALTA AVISA A RÉGUA DE RECUPERAÇÃO.
+ *
+ * A máquina existia inteira — handler `followup-gatilho-presenca.v1`
+ * registrado, `fn_appointment_recover` no banco, a tela de publicar fluxo
+ * citando o gatilho, o teste e2e documentando — e o evento que a liga NÃO ERA
+ * EMITIDO POR NINGUÉM. A única ocorrência de `appointment.outcome_confirmed`
+ * em todo o código era o próprio ouvinte (medido em 17/09/2026).
+ *
+ * Efeito: marcar "Faltou" gravava o desfecho e o cliente que não apareceu
+ * nunca recebia a mensagem de recuperação — sem erro em lugar nenhum.
+ */
+describe("a falta confirmada aciona a recuperação", () => {
+  function avisosDeFalta(): Array<{ fn: string; args: Linha }> {
+    return banco.rpc.filter(
+      (c) => c.fn === "emit_event" && c.args.p_event_type === "appointment.outcome_confirmed",
+    );
+  }
+
+  it("marcar FALTOU emite o evento que a régua escuta", async () => {
+    await alterarAgendamentoHandler(cliente(), ctx, { id: AGENDAMENTO, status: "no_show" });
+
+    const avisos = avisosDeFalta();
+    expect(
+      avisos,
+      "o cliente que não apareceu não entra em recuperação nenhuma: o fluxo fica configurado e mudo",
+    ).toHaveLength(1);
+    const args = avisos[0]!.args;
+    expect(
+      args.p_entity_kind,
+      "`fn_appointment_recover` filtra por entity_kind='appointment'; outro valor faz a função não achar o evento",
+    ).toBe("appointment");
+    expect(args.p_entity_id).toBe(AGENDAMENTO);
+    expect(
+      (args.p_payload as Linha).appointment_revision,
+      "a função lê a revisão do payload para casar com o compromisso — sem ela, recusa",
+    ).toBeDefined();
+  });
+
+  it("marcar REALIZADO não aciona recuperação — quem compareceu não precisa ser recuperado", async () => {
+    await alterarAgendamentoHandler(cliente(), ctx, { id: AGENDAMENTO, status: "completed" });
+    expect(
+      avisosDeFalta(),
+      "enrollar quem esteve na reunião é cobrar presença de quem já compareceu",
+    ).toHaveLength(0);
+  });
+
+  it("cancelar também não aciona — cancelar é decisão, faltar é ausência", async () => {
+    await cancelarAgendamentoHandler(cliente(), ctx, { id: AGENDAMENTO, reason: "cliente pediu" });
+    expect(avisosDeFalta()).toHaveLength(0);
+  });
+});
