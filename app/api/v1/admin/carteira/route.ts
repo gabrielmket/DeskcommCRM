@@ -26,6 +26,7 @@ import { requirePlatformAdmin } from "@/lib/auth/requirePlatformAdmin";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { creditoAcabando, derivarSaldo, type LancamentoDaCarteira } from "@/lib/carteira/saldo";
+import { pisoDoPreco } from "@/lib/broadcast/margem";
 
 export const dynamic = "force-dynamic";
 
@@ -104,9 +105,41 @@ export async function GET(req: NextRequest) {
       ? null
       : Number(precoRes.data.alerta_saldo_cents);
 
+  /**
+   * O que a META cobra por uma mensagem de marketing hoje — o PISO do preço.
+   *
+   * Vai junto na resposta para a tela avisar ANTES de alguém digitar um valor
+   * abaixo do custo. Descobrir isso na conferência da fatura, um mês depois, é
+   * tarde: as mensagens já saíram e o prejuízo já é por mensagem.
+   *
+   * ⚠️ É custo de PLATAFORMA e só aparece nesta rota (painel administrativo).
+   * A rota do cliente (/api/v1/carteira) não o devolve — o cliente vê o que
+   * paga, nunca o que pagamos.
+   */
+  const { data: tarifa } = await admin
+    .from("platform_meta_pricing")
+    .select("preco_cents, gratuitas_por_mes, vigente_desde, moeda")
+    .eq("categoria", "marketing")
+    .eq("pais", "BR")
+    .order("vigente_desde", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const piso = pisoDoPreco(
+    tarifa
+      ? {
+          categoria: "marketing",
+          precoCents: Number(tarifa.preco_cents),
+          gratuitasPorMes: Number(tarifa.gratuitas_por_mes),
+        }
+      : null,
+  );
+
   return ok(
     {
       organization_id: orgId,
+      custo_da_meta_cents: piso,
+      custo_vigente_desde: (tarifa?.vigente_desde as string | null) ?? null,
       saldo_cents: saldo.saldo_cents,
       creditado_cents: saldo.creditado_cents,
       debitado_cents: saldo.debitado_cents,

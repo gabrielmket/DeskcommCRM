@@ -33,6 +33,9 @@ export interface CarteiraDoTenant {
   preco_por_mensagem_cents: number | null;
   alerta_saldo_cents: number | null;
   credito_acabando: boolean;
+  /** O que a META cobra por mensagem de marketing. NULO = tarifa não cadastrada. */
+  custo_da_meta_cents: number | null;
+  custo_vigente_desde: string | null;
   extrato: LinhaDoExtrato[];
 }
 

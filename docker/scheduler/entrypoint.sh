@@ -12,9 +12,25 @@
 # máquina está se recuperando de alguma coisa.
 set -eu
 
-if [ -z "${INTERNAL_SECRET:-}" ]; then
-  echo "scheduler: INTERNAL_SECRET vazio — os crons responderiam 401 em silêncio." >&2
-  echo "scheduler: confira a chave no .env e suba de novo." >&2
+# ⚠️ A MESMA PRECEDÊNCIA DO APP, e não só "alguma chave".
+#
+# As rotas de cron conferem `INTERNAL_CRON_SECRET || INTERNAL_SECRET`: quando a
+# primeira existe, é ELA que vale. Este entrypoint mandava `INTERNAL_SECRET`
+# sempre — então numa instalação com as DUAS definidas e diferentes (que é o que
+# o template de ambiente gera) todo cron respondia 401, em silêncio.
+#
+# Medido na instalação da Time Company em 17/09/2026: nenhum cron rodou desde a
+# implantação. Caíram JUNTOS os follow-ups automáticos, a sincronização da
+# agenda com o Google, a saúde dos canais, a recuperação de mensagem presa, a
+# cotação do dólar e a fatura do provedor de IA. O sintoma era ZERO: nada de
+# erro na tela, nada no log do app, só coisas que não aconteciam.
+#
+# A guarda abaixo já existia e não pegava: ela confere se a chave está VAZIA,
+# não se é a CERTA — e chave errada passa por "não vazia".
+SEGREDO_DO_CRON="${INTERNAL_CRON_SECRET:-${INTERNAL_SECRET:-}}"
+if [ -z "$SEGREDO_DO_CRON" ]; then
+  echo "scheduler: INTERNAL_CRON_SECRET e INTERNAL_SECRET vazios — os crons responderiam 401 em silêncio." >&2
+  echo "scheduler: confira as chaves no .env e suba de novo." >&2
   exit 1
 fi
 
@@ -33,7 +49,7 @@ APP_ORIGIN="http://app:3000"
 # versão com aspas duplas entregava `segrafaelmelgacoredo/Users/rafaelmelgaco…`,
 # com o `whoami` EXECUTADO. Aqui o valor vai entre aspas SIMPLES, com as aspas
 # simples internas escapadas — dentro delas o sh não interpreta nada.
-SEGREDO_SEGURO="$(printf '%s' "$INTERNAL_SECRET" | sed "s/'/'\\\\''/g")"
+SEGREDO_SEGURO="$(printf '%s' "$SEGREDO_DO_CRON" | sed "s/'/'\\\\''/g")"
 
 # minuto|timeout|caminho — uma linha por cron. O caminho vai COMPLETO de
 # propósito: o literal `api/v1/cron/<rota>` é o contrato que

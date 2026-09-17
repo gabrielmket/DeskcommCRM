@@ -98,6 +98,37 @@ check "sai com código 1" test "$RC" -eq 1
 check "explica o motivo na saída" grep -q "INTERNAL_SECRET" "$TMP/saida"
 check "não deixou crontab pela metade" test ! -s "$TMP/crontab"
 
+# ── A CHAVE CERTA, e não só "alguma chave" ───────────────────────────────────
+#
+# As rotas de cron conferem `INTERNAL_CRON_SECRET || INTERNAL_SECRET`: quando a
+# primeira existe, é ELA que vale. O entrypoint mandava `INTERNAL_SECRET` sempre
+# — e numa instalação com as duas definidas e DIFERENTES (o que o template de
+# ambiente gera) todo cron respondia 401, em silêncio.
+#
+# Medido na instalação da Time Company em 17/09/2026: nenhum cron rodou desde a
+# implantação. Follow-up automático, agenda do Google, saúde dos canais,
+# recuperação de mensagem presa, cotação e fatura do provedor — todos mudos, sem
+# um erro em lugar nenhum.
+#
+# A guarda antiga NÃO pegava isso: ela conferia se a chave estava vazia, e chave
+# errada passa por "não vazia".
+echo "scheduler: usa INTERNAL_CRON_SECRET quando ela existe"
+: > "$TMP/crontab"
+env INTERNAL_SECRET="a-chave-generica" INTERNAL_CRON_SECRET="a-chave-do-cron"   PATH="$TMP/bin:$PATH" CRONTAB_PATH="$TMP/crontab" sh "$ENTRYPOINT" >"$TMP/saida" 2>&1
+check "manda a chave do CRON no header" grep -q "Bearer a-chave-do-cron" "$TMP/crontab"
+check "não manda a genérica" sh -c "! grep -q \"Bearer a-chave-generica\" \"$TMP/crontab\""
+
+echo "scheduler: sem a do cron, cai na genérica (instalação antiga não quebra)"
+: > "$TMP/crontab"
+env -u INTERNAL_CRON_SECRET INTERNAL_SECRET="so-a-generica"   PATH="$TMP/bin:$PATH" CRONTAB_PATH="$TMP/crontab" sh "$ENTRYPOINT" >"$TMP/saida" 2>&1
+check "cai no fallback" grep -q "Bearer so-a-generica" "$TMP/crontab"
+
+echo "scheduler: sem NENHUMA das duas, recusa"
+: > "$TMP/crontab"
+env -u INTERNAL_CRON_SECRET -u INTERNAL_SECRET   PATH="$TMP/bin:$PATH" CRONTAB_PATH="$TMP/crontab" sh "$ENTRYPOINT" >"$TMP/saida" 2>&1
+RC=$?
+check "sai com código 1 quando falta tudo" test "$RC" -eq 1
+
 if [ "$fail" -eq 0 ]; then
   echo "OK — todas as provas passaram."
 else

@@ -137,6 +137,32 @@ export function CarteiraDoTenant({ organizationId }: { organizationId: string })
             ? t("Sem preço acordado — o disparador RECUSA até alguém definir, em vez de supor.")
             : `${t("Hoje:")} ${formatCentsBRL(data.preco_por_mensagem_cents)} ${t("por mensagem")}`}
         </p>
+        {/* O CUSTO, ao lado do preço. Sem ele, "margem" é chute — e o chute
+            mais caro é o de supor que a Meta dá mensagem de marketing de graça
+            (o gratuito dela é de conversa de SERVIÇO, iniciada pelo cliente). */}
+        {data.custo_da_meta_cents === null ? (
+          <p className="text-xs text-warning-fg">
+            {t("A tarifa da Meta não está cadastrada — sem ela não dá para saber se este preço dá lucro.")}
+          </p>
+        ) : (
+          <p
+            className={
+              data.preco_por_mensagem_cents !== null &&
+              data.preco_por_mensagem_cents < data.custo_da_meta_cents
+                ? "text-xs text-error-fg"
+                : "text-xs text-text-muted"
+            }
+          >
+            {t("A Meta cobra")} {formatCentsBRL(data.custo_da_meta_cents)} {t("por mensagem")}
+            {data.preco_por_mensagem_cents !== null
+              ? data.preco_por_mensagem_cents < data.custo_da_meta_cents
+                ? ` — ${t("este preço está ABAIXO do custo.")}`
+                : ` — ${t("margem de")} ${formatCentsBRL(
+                    data.preco_por_mensagem_cents - data.custo_da_meta_cents,
+                  )} ${t("por mensagem")}.`
+              : ""}
+          </p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <Label htmlFor="carteira-preco">{t("Preço por mensagem (R$)")}</Label>
