@@ -18,8 +18,10 @@ import { requireRole } from "@/lib/auth/require-role";
 import { metaSessionForOrg } from "@/lib/channels/meta/session";
 import { normalizeRejectedReason } from "@/lib/channels/meta/webhook";
 import { deriveTemplateContract, describeAddress } from "@/lib/channels/meta/template-contract";
+import { credenciaisDaOrg } from "@/lib/channels/meta/credenciais-da-org";
 import { syncTemplates } from "@/lib/channels/meta/template-sync";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -154,20 +156,25 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
   const r = await orgOrFail(requestId);
   if (!r.autorizado) return r.resposta;
 
-  const sessao = await metaSessionForOrg(r.orgId);
-  if (!sessao?.wabaId) {
+  /**
+   * A credencial vem do CANAL, e só cai no ambiente quando não há canal.
+   *
+   * Antes daqui saía `META_SYSTEM_USER_TOKEN` e nada mais: quem conectasse o
+   * número pela TELA — que é como todo cliente conecta — recebia
+   * `missing_meta_token` com o canal verde na tela. E uma variável de ambiente
+   * é UMA: numa instalação com N clientes ela não tem como servir aos dois.
+   */
+  const creds = await credenciaisDaOrg(await createClient(), r.orgId);
+  if (!creds) {
     return fail("invalid_request", "no_meta_channel", 400, { requestId });
   }
-
-  const token = process.env.META_SYSTEM_USER_TOKEN ?? "";
-  if (!token) return fail("invalid_request", "missing_meta_token", 400, { requestId });
 
   try {
     const counts = await syncTemplates({
       organizationId: r.orgId,
-      wabaId: sessao.wabaId,
-      token,
-      graphVersion: process.env.META_GRAPH_VERSION ?? "v22.0",
+      wabaId: creds.wabaId,
+      token: creds.token,
+      graphVersion: creds.graphVersion,
     });
     return ok(counts);
   } catch (err) {

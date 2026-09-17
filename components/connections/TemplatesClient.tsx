@@ -10,6 +10,7 @@ import {
   type TemplatePreview,
 } from "@/hooks/channels/useTemplates";
 import { useT } from "@/hooks/i18n/useT";
+import { CriarTemplate } from "./CriarTemplate";
 
 /** Só APPROVED pode ser disparado — o resto é informação, não opção. */
 function statusTone(status: string): "default" | "secondary" | "destructive" | "outline" {
@@ -97,18 +98,20 @@ export function TemplatesClient() {
           {t("Espelho da conta")} <span className="font-mono text-xs">{waba}</span> ·{" "}
           {templates.length} {t("template(s)")}
         </p>
-        <Button onClick={sincronizar} disabled={sync.isPending} data-testid="btn-sync">
-          {sync.isPending ? t("Sincronizando…") : t("Sincronizar com a Meta")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <CriarTemplate />
+          <Button onClick={sincronizar} disabled={sync.isPending} data-testid="btn-sync">
+            {sync.isPending ? t("Sincronizando…") : t("Sincronizar com a Meta")}
+          </Button>
+        </div>
       </div>
 
       {templates.length === 0 ? (
         <Card className="p-6">
           <h2 className="font-medium">{t("Nenhum template ainda")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {t("Crie templates no Gerenciador do WhatsApp e clique em")}{" "}
-            <strong>{t("Sincronizar com a Meta")}</strong>.{" "}
-            {t("Só templates aprovados podem ser enviados fora da janela de 24 horas.")}
+            {t("Use")} <strong>{t("Criar template")}</strong>{" "}
+            {t("aqui mesmo — a Meta analisa e o estado aparece nesta tela. Só template aprovado pode ser enviado fora da janela de 24 horas.")}
           </p>
         </Card>
       ) : (

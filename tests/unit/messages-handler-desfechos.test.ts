@@ -97,9 +97,19 @@ function makeSupabase(
   const client = {
     from(table: string) {
       if (table === "channel_sessions") {
-        const query = {
+        // `is` entrou quando o envio de TEMPLATE passou a resolver a credencial
+        // do canal (antes lia só variável de ambiente): o caminho real filtra
+        // `archived_at is null`, e sem este método o dublê estourava com
+        // "base(...).is is not a function" — um vermelho que não fala do
+        // comportamento sob teste e manda quem lê procurar defeito onde não há.
+        //
+        // A linha devolvida NÃO tem `meta_token_encrypted`, de propósito: é a
+        // instalação que nunca conectou pela tela, e é ela que exercita o
+        // fallback para o ambiente que estes casos usam.
+        const query: Record<string, unknown> = {
           select: () => query,
           eq: () => query,
+          is: () => query,
           maybeSingle: async () => ({ data: { metadata: opts.channelMetadata ?? {} }, error: null }),
         };
         return query;

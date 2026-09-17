@@ -15,6 +15,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { resolveMetaCreds } from "./credentials";
 import { sendTemplate } from "./send-template";
 
 export interface SendTemplateForSessionInput {
@@ -22,6 +23,14 @@ export interface SendTemplateForSessionInput {
   organizationId: string;
   /** Destinatário em dígitos E.164, já resolvido pelo adapter. */
   to: string;
+  /**
+   * Por QUAL número sai. É o `meta_phone_number_id` da sessão.
+   *
+   * Opcional só por compatibilidade com quem chamava antes de a credencial da
+   * sessão existir neste caminho: sem ele, cai no número do ambiente, que é a
+   * instalação de número único.
+   */
+  phoneNumberId?: string;
   name: string;
   language: string;
   values: Record<string, string>;
@@ -43,21 +52,30 @@ export async function sendTemplateForSession(
     throw new Error("template_incompleto: nome e idioma são obrigatórios em type=template");
   }
 
-  // A credencial de AMBIENTE é o único caminho deste envio, e a guarda vem
-  // ANTES da consulta ao espelho de propósito: "canal não conectado" é desfecho
-  // da classe `queued` (recuperável), e a ordem dos desfechos é comportamento
-  // neste repo. Sem ela, uma instalação que conectou o número pela TELA
-  // (credencial cifrada no banco, `.env` sem chave) tentaria a Graph com
-  // `Bearer` vazio e viraria `failed` com um erro que não nomeia o motivo real
-  // — a mudança de elegibilidade da #674 transformaria uma fila recuperável em
-  // falha. Com ela, o desfecho é o mesmo de antes do #674: `queued` com
-  // `meta_not_configured`.
-  //
-  // Enviar template com a credencial da SESSÃO é um passo próprio (o adapter
-  // ainda não implementa `sendTemplate`); até lá, este caminho é só do env.
-  if (!process.env.META_PHONE_NUMBER_ID || !process.env.META_SYSTEM_USER_TOKEN) {
+  /**
+   * A credencial vem da SESSÃO, e só cai no ambiente quando não há sessão.
+   *
+   * Antes este caminho lia `META_PHONE_NUMBER_ID`/`META_SYSTEM_USER_TOKEN` e
+   * mais nada: quem conectasse o número PELA TELA — que é como todo cliente vai
+   * conectar — tinha o canal funcionando para conversa e mudo para template. E
+   * template é o único jeito de falar com quem está fora da janela de 24h, que
+   * é justamente o que o disparador faz.
+   *
+   * Uma variável de ambiente também não tem como servir a N clientes: ela é uma
+   * só, e cada cliente tem o número dele. `resolveMetaCreds` já resolvia isso
+   * para mensagem comum (sessão primeiro, env depois) — aqui é a mesma função,
+   * e não uma segunda régua que divergiria na primeira mudança.
+   *
+   * A guarda continua ANTES da consulta ao espelho: "sem credencial" é desfecho
+   * recuperável (`queued`), e a ordem dos desfechos é comportamento neste repo.
+   */
+  const creds = await resolveMetaCreds(db, {
+    organizationId: input.organizationId,
+    phoneNumberId: input.phoneNumberId ?? process.env.META_PHONE_NUMBER_ID ?? "",
+  });
+  if (!creds) {
     throw new Error(
-      "meta_not_configured: sem credencial de ambiente para enviar template (a conexão feita pela tela ainda não é usada por este caminho).",
+      "meta_not_configured: sem credencial para enviar template (nem na sessão, nem no ambiente).",
     );
   }
 
@@ -73,9 +91,9 @@ export async function sendTemplateForSession(
 
   await input.beforeSend?.();
   const resultado = await sendTemplate({
-    phoneNumberId: process.env.META_PHONE_NUMBER_ID ?? "",
-    token: process.env.META_SYSTEM_USER_TOKEN ?? "",
-    graphVersion: process.env.META_GRAPH_VERSION ?? "v22.0",
+    phoneNumberId: creds.phoneNumberId,
+    token: creds.token,
+    graphVersion: creds.graphVersion,
     to: input.to,
     binding: {
       name: input.name,

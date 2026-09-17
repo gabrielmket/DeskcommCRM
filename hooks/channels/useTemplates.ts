@@ -63,3 +63,35 @@ export function useSyncTemplates() {
     },
   });
 }
+
+export interface NovoTemplateInput {
+  name: string;
+  language: string;
+  category: "MARKETING" | "UTILITY" | "AUTHENTICATION";
+  body: string;
+  exemplos?: string[];
+  botoes?: string[];
+  header?: string;
+  footer?: string;
+}
+
+/**
+ * Cria o template NA META, daqui.
+ *
+ * Invalida a lista no sucesso porque a própria rota já sincroniza depois de
+ * criar — sem isso o template novo só apareceria no próximo sync manual, e
+ * pareceria que a criação falhou.
+ */
+export function useCriarTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: NovoTemplateInput) =>
+      apiClient.post<{ data: { id: string; status: string; category: string } }>(
+        "/api/v1/channels/templates/criar",
+        input,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["channel-templates"] });
+    },
+  });
+}

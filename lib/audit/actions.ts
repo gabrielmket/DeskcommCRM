@@ -169,6 +169,9 @@ export const AUDIT_ACTIONS = [
   // cancelamento, que é a metade que costuma sumir.
   "platform_admin.modulo_liberado",
   "platform_admin.modulo_cancelado",
+  // Submeter template fala em nome da marca na Meta, e reprovação suja a conta
+  // inteira: quem submeteu, o quê e quando precisa ficar registrado.
+  "channels.template_criado",
   "platform_admin.users_listed",
   "platform_admin.user_viewed",
   "platform_admin.platform_admins_listed",
