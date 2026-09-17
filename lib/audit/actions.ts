@@ -172,6 +172,10 @@ export const AUDIT_ACTIONS = [
   // Submeter template fala em nome da marca na Meta, e reprovação suja a conta
   // inteira: quem submeteu, o quê e quando precisa ficar registrado.
   "channels.template_criado",
+  // MIA Broadcast: cada disparo gasta dinheiro do cliente. Quem mandou, para
+  // quantos e a que preço é a primeira pergunta quando a fatura é contestada.
+  "broadcast.criado",
+  "broadcast.disparado",
   "platform_admin.users_listed",
   "platform_admin.user_viewed",
   "platform_admin.platform_admins_listed",

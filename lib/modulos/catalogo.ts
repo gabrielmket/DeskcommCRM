@@ -48,8 +48,8 @@ export const MODULOS: readonly ModuloVendavel[] = [
       "Enviar mensagem para uma lista de contatos pela API oficial da Meta, com crédito próprio e cobrança por mensagem.",
     // A carteira faz parte do módulo: crédito só existe para gastar aqui, e
     // mostrar saldo a quem não pode disparar seria vender por acidente.
-    rotas: ["/api/v1/carteira"],
-    telas: ["/app/settings/carteira"],
+    rotas: ["/api/v1/carteira", "/api/v1/broadcasts"],
+    telas: ["/app/settings/carteira", "/app/broadcast"],
   },
 ] as const;
 

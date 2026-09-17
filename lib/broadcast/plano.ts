@@ -37,14 +37,23 @@ export interface ContatoParaDisparo {
   id: string;
   phone_number: string | null;
   display_name?: string | null;
-  /** Quem pediu para sair NÃO entra, e essa é a regra que segura bloqueio. */
-  opted_out?: boolean | null;
+  /** Bloqueado no atendimento — não recebe nada, nem disparo. */
+  is_blocked?: boolean | null;
+  /**
+   * A RECUSA REGISTRADA. É `declined_at` e não a ausência de `granted_at`, e a
+   * diferença é a instalação inteira: todo contato NASCE sem `granted_at`, então
+   * barrar por ausência barraria também "ninguém nunca perguntou" — que é o
+   * estado de quase toda a base. O argumento completo está em
+   * `lib/automation/guarda-do-contato.ts`, e esta é a MESMA régua: duas réguas
+   * de consentimento no mesmo produto divergem na primeira correção.
+   */
+  consent?: { marketing?: { declined_at?: string | null } | null } | null;
 }
 
 /**
  * Monta a lista final.
  *
- * ⚠️ O opt-out é filtro DURO e fica aqui, não numa condição da tela: quem pediu
+ * ⚠️ A recusa é filtro DURO e fica aqui, não numa condição da tela: quem pediu
  * para não receber e recebe de novo denuncia, e denúncia derruba o número
  * inteiro — não só aquela mensagem. É a regra mais barata de respeitar e a mais
  * cara de esquecer.
@@ -70,7 +79,7 @@ export function peneirar(
       semTelefone += 1;
       continue;
     }
-    if (c.opted_out) {
+    if (c.is_blocked || c.consent?.marketing?.declined_at) {
       semConsentimento += 1;
       continue;
     }

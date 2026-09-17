@@ -20,7 +20,12 @@ describe("a peneira da lista", () => {
     const r = peneirar(
       [
         { id: "a", phone_number: "5531999990000" },
-        { id: "b", phone_number: "5531999991111", opted_out: true },
+        { id: "b", phone_number: "5531999991111", is_blocked: true },
+        {
+          id: "c",
+          phone_number: "5531999992222",
+          consent: { marketing: { declined_at: "2026-09-01T00:00:00Z" } },
+        },
       ],
       valores,
     );
@@ -28,7 +33,7 @@ describe("a peneira da lista", () => {
       r.enviar.map((d) => d.contactId),
       "quem pediu para não receber recebeu de novo: denúncia derruba o número inteiro, não só a mensagem",
     ).toEqual(["a"]);
-    expect(r.semConsentimento).toBe(1);
+    expect(r.semConsentimento, "bloqueado e recusa registrada contam os dois").toBe(2);
   });
 
   it("tira o telefone REPETIDO — cobraria duas vezes e mandaria duas vezes", () => {

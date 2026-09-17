@@ -587,6 +587,20 @@ export const NAV_CATALOG = [
     section: "Sua conta",
   },
   {
+    // MIA BROADCAST. Mora em ATENDIMENTO e não em Organização: é operação —
+    // alguém abre isto para MANDAR mensagem, não para configurar nada. A
+    // vizinha Créditos fica em Organização pelo motivo oposto (é dinheiro e
+    // contrato), e as duas somem juntas para quem não contratou o módulo.
+    href: "/app/broadcast",
+    label: "MIA Broadcast",
+    description: "Enviar para uma lista pela API oficial, com template aprovado e cobrança por mensagem.",
+    icon: "Megaphone",
+    group: "atendimento",
+    sidebar: true,
+    // manager+: cada mensagem gasta dinheiro do cliente.
+    minRole: "manager",
+  },
+  {
     // O CRÉDITO do cliente, e o extrato que o explica. Mora em Organização e
     // não em Análise porque é dinheiro e contrato — vizinha de Equipe e de
     // Conversões —, e porque o extrato responde "por que meu saldo caiu",
