@@ -5,6 +5,7 @@ import { ROLE_RANK } from "@/lib/auth/types";
 
 import { MetricsClient } from "./_components/MetricsClient";
 import { PainelDeMetas } from "@/components/metas/PainelDeMetas";
+import { RelatorioDeVendas } from "@/components/metas/RelatorioDeVendas";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Desempenho" };
@@ -34,6 +35,11 @@ export default async function MetricsPage() {
       {/* A meta vem ANTES do diagnóstico: quem abre Desempenho quer primeiro
           saber se vai bater o mês, e só depois por que. */}
       <PainelDeMetas />
+
+      {/* O relatório vem DEPOIS da meta e ANTES do diagnóstico do funil:
+          quem abre quer saber se bate o mês (meta), depois o que aconteceu
+          (relatório), e só então onde os negócios estão parados (funil). */}
+      {canCompare ? <RelatorioDeVendas /> : null}
 
       <MetricsClient canCompare={canCompare} currentUserId={user.id} />
     </div>
