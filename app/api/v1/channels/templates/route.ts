@@ -164,7 +164,7 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
    * `missing_meta_token` com o canal verde na tela. E uma variável de ambiente
    * é UMA: numa instalação com N clientes ela não tem como servir aos dois.
    */
-  const creds = await credenciaisDaOrg(await createClient(), r.orgId);
+  const creds = await credenciaisDaOrg(r.orgId);
   if (!creds) {
     return fail("invalid_request", "no_meta_channel", 400, { requestId });
   }

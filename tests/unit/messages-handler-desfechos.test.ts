@@ -32,8 +32,31 @@ const WAHA_BASE = 'http://localhost:3030';
 const signedUrl = vi.fn<() => Promise<{ data: { signedUrl: string } | null; error: { message: string } | null }>>(
   async () => ({ data: { signedUrl: 'https://signed.example/a.jpg' }, error: null }),
 );
+// O admin client ganhou um SEGUNDO papel: além do Storage, é por ele que a
+// credencial do canal é lida. Não é preferência de estilo — o token vive cifrado
+// e `fn_decrypt_oauth` é `grant execute ... to service_role` (migration 0116),
+// então decifrar com o client do usuário é impossível por construção. Antes o
+// caminho recebia o client de quem chamasse, e a recusa de permissão virava
+// "sem credencial" calada.
+//
+// A linha devolvida aqui NÃO tem `meta_token_encrypted`, pelo mesmo motivo do
+// dublê lá de baixo: é a instalação que nunca conectou pela tela, e é ela que
+// exercita o fallback para o ambiente que estes casos usam.
 vi.mock('@/lib/supabase/admin', () => ({
-  createAdminClient: () => ({ storage: { from: () => ({ createSignedUrl: signedUrl }) } }),
+  createAdminClient: () => ({
+    storage: { from: () => ({ createSignedUrl: signedUrl }) },
+    from: () => {
+      const query: Record<string, unknown> = {
+        select: () => query,
+        eq: () => query,
+        is: () => query,
+        order: () => query,
+        limit: () => query,
+        maybeSingle: async () => ({ data: {}, error: null }),
+      };
+      return query;
+    },
+  }),
 }));
 // Audit é fire-and-forget e escreve em outra tabela; fora do escopo dos desfechos.
 vi.mock('@/lib/audit', () => ({ audit: vi.fn(async () => {}) }));

@@ -62,8 +62,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   }
 
-  const db = await createClient();
-  const creds = await credenciaisDaOrg(db, authz.org.orgId);
+  const creds = await credenciaisDaOrg(authz.org.orgId);
   if (!creds) {
     return fail("invalid_request", "Nenhum canal oficial conectado.", 400, { requestId });
   }

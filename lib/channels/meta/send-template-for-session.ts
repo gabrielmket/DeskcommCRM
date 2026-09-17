@@ -15,6 +15,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveMetaCreds } from "./credentials";
 import { sendTemplate } from "./send-template";
 
@@ -69,7 +70,17 @@ export async function sendTemplateForSession(
    * A guarda continua ANTES da consulta ao espelho: "sem credencial" é desfecho
    * recuperável (`queued`), e a ordem dos desfechos é comportamento neste repo.
    */
-  const creds = await resolveMetaCreds(db, {
+  /**
+   * `createAdminClient()` e NÃO o `db` do chamador — o token está cifrado, e
+   * `fn_decrypt_oauth` só é executável por service role (migration 0116). Com o
+   * client do usuário a RPC é recusada, `decryptWebhookSecret` devolve `null`, e
+   * a recusa de PERMISSÃO vira "sem credencial" — o envio cai no `.env` ou
+   * fracassa dizendo que não há canal, com o canal conectado.
+   *
+   * O `db` do chamador continua valendo para a leitura do espelho logo abaixo,
+   * que é consulta comum e não tem por que escapar da RLS de quem pediu.
+   */
+  const creds = await resolveMetaCreds(createAdminClient(), {
     organizationId: input.organizationId,
     phoneNumberId: input.phoneNumberId ?? process.env.META_PHONE_NUMBER_ID ?? "",
   });

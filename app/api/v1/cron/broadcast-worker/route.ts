@@ -66,7 +66,7 @@ async function handler(req: NextRequest): Promise<Response> {
     | undefined;
   if (!alvo) return ok({ rodou: false, motivo: "nada_na_fila" }, { requestId });
 
-  const creds = await credenciaisDaOrg(admin, alvo.organization_id);
+  const creds = await credenciaisDaOrg(alvo.organization_id);
   if (!creds) {
     // Sem canal a campanha não anda, e deixá-la em `enviando` faria o cron
     // tentar para sempre. Pausar com o motivo é o que põe isso na tela.

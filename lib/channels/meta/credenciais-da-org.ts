@@ -1,7 +1,6 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { queryTolerantToMissingArchived, ARCHIVED_AT } from "@/lib/channels/archived";
 import { CHANNEL_PROVIDER_META } from "@/lib/channels/capabilities";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveMetaCreds } from "./credentials";
 
 /**
@@ -16,6 +15,23 @@ import { resolveMetaCreds } from "./credentials";
  *
  * O fallback para o ambiente continua, e é o que mantém de pé a instalação de
  * número único que nunca conectou pela tela.
+ *
+ * ── Por que ela CRIA o client em vez de receber um ──────────────────────────
+ *
+ * Porque receber era a forma de errar, e erramos: as rotas de template passavam
+ * o client do USUÁRIO. O token vive cifrado, e `fn_decrypt_oauth` é
+ * `revoke execute ... from authenticated` / `grant ... to service_role`
+ * (migration 0116) — decifrar com o client do usuário é impossível por
+ * construção. Pior: `decryptWebhookSecret` devolve `null` quando a RPC recusa,
+ * então a falha de permissão virava "esta sessão não tem token", caía no `.env`,
+ * e a rota concluía "nenhum canal conectado" com o canal verde na tela. Nenhum
+ * erro, em lugar nenhum — o MESMO sintoma que esta função existe para consertar,
+ * uma camada abaixo.
+ *
+ * Passar a criar o client aqui não amplia privilégio: o recorte por organização
+ * já era feito À MÃO (`.eq("organization_id", …)`) justamente porque o service
+ * role bypassa RLS, e o `organizationId` continua vindo de quem já autorizou o
+ * pedido. O que muda é que deixa de existir um jeito de o chamador errar.
  */
 export interface CredenciaisDaOrg {
   wabaId: string;
@@ -27,9 +43,11 @@ export interface CredenciaisDaOrg {
 }
 
 export async function credenciaisDaOrg(
-  db: SupabaseClient,
   organizationId: string,
 ): Promise<CredenciaisDaOrg | null> {
+  // Service role de propósito: ver o cabeçalho. O filtro por organização abaixo
+  // é o que substitui a RLS que este client contorna.
+  const db = createAdminClient();
   const base = () =>
     db
       .from("channel_sessions")
