@@ -73,6 +73,43 @@ export function CanalOficialClient() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="canal-oficial-root">
+      {/*
+        O AVISO VEM PRIMEIRO, e vem antes até do cartão de "conectado".
+
+        Sem os dois segredos de servidor, a Meta ENTREGA e nós recusamos: todo
+        POST morre em 401 de assinatura, sem linha no inbox e sem erro nenhum
+        na tela. O operador vê "conectado", manda um "oi" do celular, não recebe
+        nada e vai procurar defeito no número — que é o único lugar onde o
+        defeito não está.
+
+        A checagem já existia em `lib/channels/meta/webhook.ts`, com este modo
+        de falha escrito por extenso, e só era consultada no ONBOARDING. Quem
+        conecta um número meses depois — o caso normal, e o de quem troca de
+        número — nunca a via.
+      */}
+      {estado && estado.podeReceber === false ? (
+        <Card className="border-destructive p-4" data-testid="canal-oficial-nao-recebe">
+          <h2 className="font-medium text-destructive">
+            {t("Este canal envia, mas NÃO recebe")}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t(
+              "Falta segredo no servidor. A Meta vai entregar as respostas e o sistema vai recusar todas, sem erro visível: o cliente responde e a mensagem não aparece em lugar nenhum.",
+            )}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {(estado.faltaNoAmbiente ?? []).map((nome) => (
+              <Badge key={nome} variant="destructive" className="font-mono text-xs">
+                {nome}
+              </Badge>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t("Defina no .env do servidor e reinicie o app.")}
+          </p>
+        </Card>
+      ) : null}
+
       {estado?.connected ? (
         <Card className="p-4" data-testid="canal-conectado">
           <div className="flex flex-wrap items-center gap-2">

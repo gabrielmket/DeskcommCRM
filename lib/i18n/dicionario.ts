@@ -3734,6 +3734,15 @@ export const DICIONARIO: Traducoes = {
   Copiar: { es: "Copiar" },
   "Conectado:": { es: "Conectado:" },
   "credencial guardada": { es: "credencial guardada" },
+  "Este canal envia, mas NÃO recebe": { es: "Este canal envía, pero NO recibe" },
+  lidas: { es: "leídas" },
+  devolvidas: { es: "devueltas" },
+  "Falta segredo no servidor. A Meta vai entregar as respostas e o sistema vai recusar todas, sem erro visível: o cliente responde e a mensagem não aparece em lugar nenhum.":
+    {
+      es: "Falta un secreto en el servidor. Meta va a entregar las respuestas y el sistema las va a rechazar todas, sin error visible: el cliente responde y el mensaje no aparece en ninguna parte.",
+    },
+  "Defina no .env do servidor e reinicie o app.":
+    { es: "Definilo en el .env del servidor y reiniciá la app." },
   "sem credencial": { es: "sin credencial" },
   número: { es: "número" },
   "Cole isto no painel da Meta": { es: "Pega esto en el panel de Meta" },

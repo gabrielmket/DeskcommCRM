@@ -14,6 +14,14 @@ export interface OfficialChannelState {
   displayName: string | null;
   phoneNumber: string | null;
   status: string | null;
+  /**
+   * A instalação consegue RECEBER? São DOIS segredos de servidor, e faltar um
+   * produz o pior sintoma: conecta, diz "conectado", envia — e nada volta,
+   * porque cada POST da Meta morre em 401 antes de virar linha.
+   */
+  podeReceber?: boolean;
+  /** Os NOMES do que falta no `.env`. Valor de segredo não trafega aqui. */
+  faltaNoAmbiente?: string[];
   webhook: {
     callbackUrl: string;
     verifyToken: string | null;

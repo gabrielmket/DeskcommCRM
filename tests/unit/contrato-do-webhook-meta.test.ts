@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * O CONTRATO do webhook da Cloud API.
@@ -17,15 +17,21 @@ import { describe, expect, it, vi } from "vitest";
 
 const SESSAO = { id: "sess-1", organizationId: "org-1", wabaId: "2434045433735175" };
 const APP_SECRET = "app-secret-de-teste";
+const OUTRA_SESSAO = { id: "sess-2", organizationId: "org-2", wabaId: "2434045433735175" };
 const ingeridos: unknown[] = [];
+const orgsIngeridas: string[] = [];
 
+const porToken = vi.hoisted(() => vi.fn());
+const porWaba = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/channels/meta/session", () => ({
-  metaSessionByWebhookToken: async () => SESSAO,
+  metaSessionByWebhookToken: porToken,
+  metaSessionByWabaId: porWaba,
 }));
 
 vi.mock("@/lib/channels/meta/ingest", () => ({
-  ingestMetaInbound: async (_a: unknown, e: unknown) => {
+  ingestMetaInbound: async (_a: unknown, e: unknown, opts: { organizationId: string }) => {
     ingeridos.push(e);
+    orgsIngeridas.push(opts.organizationId);
     return { status: "ingested" };
   },
 }));
@@ -138,9 +144,15 @@ describe("o payload fora do contrato é recusado, e o campo é nomeado", () => {
 });
 
 describe("a rota — o desfecho que a Meta enxerga", () => {
+  beforeEach(() => {
+    porToken.mockReset().mockResolvedValue(SESSAO);
+    porWaba.mockReset().mockResolvedValue(null);
+    ingeridos.length = 0;
+    orgsIngeridas.length = 0;
+  });
+
   it("payload real bem assinado: 200 e a mensagem é ingerida", async () => {
     vi.stubEnv("META_APP_SECRET", APP_SECRET);
-    ingeridos.length = 0;
 
     const res = await POST(pedido(REAIS[0]), ctx);
 
@@ -152,7 +164,6 @@ describe("a rota — o desfecho que a Meta enxerga", () => {
   it("`entry` torto bem assinado: 400 com o campo, e NADA é ingerido", async () => {
     // Antes era 500 (exceção não capturada) e a Meta reentregava para sempre.
     vi.stubEnv("META_APP_SECRET", APP_SECRET);
-    ingeridos.length = 0;
 
     const res = await POST(pedido({ object: "whatsapp_business_account", entry: 3 }), ctx);
 
@@ -173,6 +184,42 @@ describe("a rota — o desfecho que a Meta enxerga", () => {
     );
 
     expect(res.status).toBe(401);
+    vi.unstubAllEnvs();
+  });
+
+  /**
+   * O TOKEN ÓRFÃO — a armadilha que ficava armada esperando uma faxina.
+   *
+   * A URL de callback do app carrega o token de UM canal. Arquivar esse canal é
+   * a coisa mais natural do mundo ao trocar o número de teste pelo definitivo, e
+   * fazia a rota devolver 404 antes de olhar o corpo: TODAS as contas ficavam
+   * mudas de uma vez, e o defeito parecia estar no número novo.
+   */
+  it("canal do token ARQUIVADO: o evento ainda acha dono pela WABA", async () => {
+    vi.stubEnv("META_APP_SECRET", APP_SECRET);
+    porToken.mockResolvedValue(null);
+    porWaba.mockResolvedValue(OUTRA_SESSAO);
+
+    const res = await POST(pedido(REAIS[0]), ctx);
+
+    expect(res.status, "era 404 — e 404 aqui derruba a instalação inteira").toBe(200);
+    expect(ingeridos).toHaveLength(1);
+    expect(orgsIngeridas, "a organização sai da WABA, não do token morto").toEqual(["org-2"]);
+    vi.unstubAllEnvs();
+  });
+
+  it("token órfão E WABA desconhecida: 200 sem escrever nada", async () => {
+    vi.stubEnv("META_APP_SECRET", APP_SECRET);
+    porToken.mockResolvedValue(null);
+    porWaba.mockResolvedValue(null);
+
+    const res = await POST(pedido(REAIS[0]), ctx);
+
+    // 200 porque a Meta reentrega em backoff tudo que não recebe 2xx — e este
+    // evento nunca vai melhorar.
+    expect(res.status).toBe(200);
+    expect(ingeridos, "sem dono não se escreve em tenant nenhum").toHaveLength(0);
+    expect(await res.json()).toMatchObject({ outcomes: ["waba_desconhecida"] });
     vi.unstubAllEnvs();
   });
 });

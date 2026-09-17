@@ -29,6 +29,7 @@ import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
 import { CHANNEL_PROVIDER_META } from "@/lib/channels/capabilities";
+import { metaPodeReceber } from "@/lib/channels/meta/webhook";
 import { validateMetaCredentials } from "@/lib/channels/meta/validate-credentials";
 import { reactivateChannelSession } from "@/lib/channels/reactivate";
 import { env } from "@/lib/env";
@@ -99,6 +100,22 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     displayName: data?.display_name ?? null,
     phoneNumber: data?.phone_number ?? null,
     status: data?.status ?? null,
+    /**
+     * A instalação consegue RECEBER? — a pergunta que ninguém fazia aqui.
+     *
+     * `metaPodeReceber` existia, com o modo de falha inteiro escrito no
+     * comentário dela, e só era consultada no ONBOARDING. Quem conecta um
+     * número meses depois — que é o caso normal, e o de quem troca de número —
+     * nunca via o aviso. O sintoma é o pior possível: o canal conecta, a tela
+     * diz "conectado", o número ENVIA, e nada volta. Sem erro em lugar nenhum,
+     * porque cada POST da Meta morre em 401 antes de virar linha.
+     *
+     * Os NOMES das variáveis ausentes vão no corpo; os valores, nunca.
+     */
+    podeReceber: metaPodeReceber(),
+    faltaNoAmbiente: (["META_WEBHOOK_VERIFY_TOKEN", "META_APP_SECRET"] as const).filter(
+      (nome) => (process.env[nome] ?? "").trim() === "",
+    ),
     /** O que o operador precisa colar do NOSSO lado no dashboard da Meta. */
     webhook: data
       ? {

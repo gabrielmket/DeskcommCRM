@@ -241,10 +241,26 @@ export function MiaBroadcast() {
                     {new Date(c.created_at).toLocaleDateString(tag)}
                   </span>
                 </div>
+                {/*
+                  LIDAS e ESTORNADAS entram na conta porque são estados que o
+                  banco grava de verdade, e omiti-los não é resumir — é errar:
+                  `estornada` SUBSTITUI `falhou` na coluna, então a campanha
+                  mostrava menos falha do que houve e nenhum sinal de que o
+                  dinheiro tinha voltado. Quem confere o extrato via o crédito
+                  sem achar a linha que o explica.
+
+                  Os dois só aparecem quando existem: campanha sem estorno não
+                  ganha um "0 devolvidas" para o operador ter que ignorar.
+                */}
                 <p className="mt-1 text-xs text-muted-foreground tabular-nums">
                   {c.andamento.total} {t("na lista")} · {c.andamento.enviada ?? 0} {t("enviadas")} ·{" "}
-                  {c.andamento.entregue ?? 0} {t("entregues")} · {c.andamento.falhou ?? 0}{" "}
-                  {t("falhas")} · {c.andamento.pendente ?? 0} {t("na fila")}
+                  {c.andamento.entregue ?? 0} {t("entregues")}
+                  {c.andamento.lida ? ` · ${c.andamento.lida} ${t("lidas")}` : null} ·{" "}
+                  {c.andamento.falhou ?? 0} {t("falhas")}
+                  {c.andamento.estornada
+                    ? ` · ${c.andamento.estornada} ${t("devolvidas")}`
+                    : null}{" "}
+                  · {c.andamento.pendente ?? 0} {t("na fila")}
                 </p>
                 {c.motivo_da_parada ? (
                   <p className="mt-1 text-xs text-warning-fg">
