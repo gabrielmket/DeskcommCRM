@@ -37,6 +37,7 @@ import {
   type CampanhaCriada,
 } from "@/hooks/useBroadcasts";
 import { formatCentsBRL } from "@/lib/money";
+import { CartaoDaCampanha } from "./CartaoDaCampanha";
 
 const ROTULO_DO_STATUS: Record<Campanha["status"], string> = {
   rascunho: "Rascunho",
@@ -69,16 +70,43 @@ export function MiaBroadcast() {
   const [nome, setNome] = useState("");
   const [template, setTemplate] = useState("");
   const [tags, setTags] = useState("");
+  const [valores, setValores] = useState<Record<string, string>>({});
   const [recemCriada, setRecemCriada] = useState<CampanhaCriada | null>(null);
 
   // Só APPROVED entra no seletor: oferecer um pendente seria montar uma campanha
   // que a própria tela recusaria na hora de disparar.
   const aprovados = (templatesRes?.data.templates ?? []).filter((x) => x.status === "APPROVED");
+  const escolhido = aprovados.find((x) => `${x.name}:${x.language}` === template) ?? null;
+
+  /**
+   * AS VARIÁVEIS ALÉM DO NOME — o que faltava, e o que fez 3 de 3 falharem.
+   *
+   * A tela cravava `variavel_do_nome: "1"` e mandava `valores_padrao: {}`. Isso
+   * basta para template de uma variável e é ERRADO para qualquer outro: a Meta
+   * recusa quando a quantidade de parâmetros não bate, e a campanha inteira
+   * falhava sem a tela ter avisado nada — porque ela nem sabia quantas o
+   * template pedia.
+   *
+   * Os slots são DERIVADOS pela API a partir do template espelhado, nunca
+   * contados aqui. A `1` continua automática (é o nome do contato, que varia por
+   * destinatário); as demais são iguais para a lista toda, então o operador
+   * digita uma vez.
+   */
+  const slotsManuais = (escolhido?.slots ?? []).filter((s) => s.key !== "1");
+  const faltamValores = slotsManuais.filter((s) => !(valores[s.key] ?? "").trim());
 
   function montar() {
-    const escolhido = aprovados.find((x) => `${x.name}:${x.language}` === template);
     if (!nome.trim() || !escolhido) {
       toast.error(t("Dê um nome e escolha um template aprovado."));
+      return;
+    }
+    // Recusa AQUI em vez de deixar a Meta recusar lá: falhar 3 de 3 é barato,
+    // falhar 3.000 de 3.000 não é — e o motivo só apareceria destinatário a
+    // destinatário, depois de gasto.
+    if (faltamValores.length > 0) {
+      toast.error(
+        `${t("Preencha as variáveis do template:")} ${faltamValores.map((s) => `{{${s.key}}}`).join(", ")}`,
+      );
       return;
     }
     criar.mutate(
@@ -86,7 +114,9 @@ export function MiaBroadcast() {
         nome: nome.trim(),
         template_name: escolhido.name,
         template_language: escolhido.language,
-        valores_padrao: {},
+        valores_padrao: Object.fromEntries(
+          slotsManuais.map((s) => [s.key, (valores[s.key] ?? "").trim()]),
+        ),
         tags: tags
           .split(",")
           .map((s) => s.trim())
@@ -97,6 +127,7 @@ export function MiaBroadcast() {
         onSuccess: (r) => {
           setRecemCriada(r.data);
           setNome("");
+          setValores({});
         },
         onError: (e: unknown) => {
           toast.error(e instanceof Error ? e.message : t("Não consegui montar a campanha."));
@@ -162,9 +193,68 @@ export function MiaBroadcast() {
           </div>
         </div>
 
-        <Button className="mt-3" onClick={montar} disabled={criar.isPending}>
+        {/*
+          AS VARIÁVEIS DO TEMPLATE — o campo que faltava.
+
+          Só aparece quando o template escolhido pede mais que a variável 1, que
+          é automática (o nome do contato, e portanto diferente a cada
+          destinatário). As demais valem para a lista inteira, então se digita
+          uma vez — e é isso que as torna preenchíveis aqui em vez de exigirem
+          planilha.
+
+          Os slots vêm DERIVADOS da API a partir do template espelhado. Contar
+          `{{n}}` à mão aqui seria uma segunda régua, que divergiria da Meta na
+          primeira mudança.
+        */}
+        {slotsManuais.length > 0 ? (
+          <div className="mt-3 rounded-md border border-border/60 bg-muted/30 p-3">
+            <p className="text-xs font-medium">
+              {t("Este template pede mais informação")}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {t(
+                "A variável {{1}} é preenchida com o nome de cada contato. As de baixo são iguais para a lista toda.",
+              )}
+            </p>
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              {slotsManuais.map((slot) => (
+                <div key={slot.key} className="space-y-1">
+                  <Label htmlFor={`bc-var-${slot.key}`}>
+                    {`{{${slot.key}}}`}{" "}
+                    <span className="font-normal text-muted-foreground">({t(slot.onde)})</span>
+                  </Label>
+                  <Input
+                    id={`bc-var-${slot.key}`}
+                    value={valores[slot.key] ?? ""}
+                    onChange={(e) =>
+                      setValores((v) => ({ ...v, [slot.key]: e.target.value }))
+                    }
+                    placeholder={t("o mesmo texto para todos")}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/*
+          Desabilitar em vez de deixar clicar e recusar: a recusa da Meta viria
+          destinatário a destinatário, DEPOIS de a campanha existir — e foi
+          exatamente assim que 3 de 3 falharam sem a tela ter avisado nada.
+        */}
+        <Button
+          className="mt-3"
+          onClick={montar}
+          disabled={criar.isPending || faltamValores.length > 0}
+        >
           {criar.isPending ? t("Montando…") : t("Montar lista")}
         </Button>
+        {faltamValores.length > 0 ? (
+          <p className="mt-1.5 text-xs text-warning-fg">
+            {t("Preencha as variáveis do template:")}{" "}
+            {faltamValores.map((s) => `{{${s.key}}}`).join(", ")}
+          </p>
+        ) : null}
       </section>
 
       {recemCriada ? (
@@ -228,63 +318,12 @@ export function MiaBroadcast() {
         ) : (
           <div className="flex flex-col gap-2">
             {(campanhas ?? []).map((c) => (
-              <div key={c.id} className="rounded-md border border-border p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{c.nome}</span>
-                  <span className="rounded-sm border px-1.5 py-0.5 text-xs">
-                    {t(ROTULO_DO_STATUS[c.status])}
-                  </span>
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {c.template_name}
-                  </span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {new Date(c.created_at).toLocaleDateString(tag)}
-                  </span>
-                </div>
-                {/*
-                  LIDAS e ESTORNADAS entram na conta porque são estados que o
-                  banco grava de verdade, e omiti-los não é resumir — é errar:
-                  `estornada` SUBSTITUI `falhou` na coluna, então a campanha
-                  mostrava menos falha do que houve e nenhum sinal de que o
-                  dinheiro tinha voltado. Quem confere o extrato via o crédito
-                  sem achar a linha que o explica.
-
-                  Os dois só aparecem quando existem: campanha sem estorno não
-                  ganha um "0 devolvidas" para o operador ter que ignorar.
-                */}
-                <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                  {c.andamento.total} {t("na lista")} · {c.andamento.enviada ?? 0} {t("enviadas")} ·{" "}
-                  {c.andamento.entregue ?? 0} {t("entregues")}
-                  {c.andamento.lida ? ` · ${c.andamento.lida} ${t("lidas")}` : null} ·{" "}
-                  {c.andamento.falhou ?? 0} {t("falhas")}
-                  {c.andamento.estornada
-                    ? ` · ${c.andamento.estornada} ${t("devolvidas")}`
-                    : null}{" "}
-                  · {c.andamento.pendente ?? 0} {t("na fila")}
-                </p>
-                {c.motivo_da_parada ? (
-                  <p className="mt-1 text-xs text-warning-fg">
-                    {t(MOTIVO[c.motivo_da_parada] ?? c.motivo_da_parada)}
-                  </p>
-                ) : null}
-                {c.status === "pausada" ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="mt-2"
-                    disabled={disparar.isPending}
-                    onClick={() =>
-                      disparar.mutate(c.id, {
-                        onSuccess: () => toast.success(t("Disparo retomado.")),
-                        onError: (e: unknown) =>
-                          toast.error(e instanceof Error ? e.message : t("Não consegui retomar.")),
-                      })
-                    }
-                  >
-                    {t("Retomar")}
-                  </Button>
-                ) : null}
-              </div>
+              <CartaoDaCampanha
+                key={c.id}
+                campanha={c}
+                rotuloDoStatus={ROTULO_DO_STATUS}
+                motivo={MOTIVO}
+              />
             ))}
           </div>
         )}

@@ -68,6 +68,64 @@ export function useCriarCampanha() {
   });
 }
 
+export interface DestinatarioDaCampanha {
+  id: string;
+  nome: string | null;
+  telefone: string;
+  status: string;
+  erro: string | null;
+  enviado_em: string | null;
+}
+
+/**
+ * QUEM vai receber (ou recebeu, e com qual desfecho).
+ *
+ * `habilitado` porque a lista só é buscada quando alguém abre a campanha:
+ * carregar destinatário de toda campanha na tela inicial seria puxar milhares
+ * de linhas que ninguém pediu.
+ */
+export function useDestinatarios(id: string | null, habilitado: boolean) {
+  return useQuery({
+    queryKey: ["broadcast-destinatarios", id],
+    queryFn: async () =>
+      apiClient.get<{ data: { total: number; destinatarios: DestinatarioDaCampanha[] } }>(
+        `/api/v1/broadcasts/${id}?limite=200`,
+      ),
+    select: (r) => r.data,
+    enabled: habilitado && Boolean(id),
+    // Acompanha o disparo andando, pela mesma razão da lista de campanhas.
+    refetchInterval: habilitado ? 15_000 : false,
+  });
+}
+
+export function useExcluirCampanha() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      apiClient.delete<{ data: { id: string; excluida: boolean } }>(`/api/v1/broadcasts/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["broadcasts"] });
+    },
+  });
+}
+
+export function useEditarCampanha() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; nome?: string; tags?: string[] }) => {
+      const { id, ...resto } = input;
+      return apiClient.patch<{ data: { id: string; peneira: unknown } }>(
+        `/api/v1/broadcasts/${id}`,
+        resto,
+      );
+    },
+    onSuccess: (_r, v) => {
+      void qc.invalidateQueries({ queryKey: ["broadcasts"] });
+      void qc.invalidateQueries({ queryKey: ["broadcast-destinatarios", v.id] });
+    },
+  });
+}
+
 export function useDispararCampanha() {
   const qc = useQueryClient();
   return useMutation({

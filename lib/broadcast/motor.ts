@@ -62,6 +62,25 @@ export interface DependenciasDoMotor {
     language: string;
     values: Record<string, string>;
   }) => Promise<string | null>;
+  /**
+   * Grava o envio na CONVERSA do contato. Opcional na interface, obrigatório na
+   * prática: sem ela o disparo sai, cobra e não existe no inbox — e o agente
+   * responde a réplica do cliente sem ver o que a provocou.
+   *
+   * Recebe os VALORES, não o texto pronto: renderizar exige os componentes do
+   * template, e o motor não os conhece — nem deve. Quem os tem é o worker, que
+   * já os carregou para enviar. Manter a renderização lá evita que o motor
+   * ganhe uma segunda régua de template, que divergiria da Meta na primeira
+   * mudança.
+   *
+   * Nunca lança: quando ela roda, a Meta já aceitou e a carteira já debitou —
+   * falhar aqui e marcar `falhou` faria a campanha reenviar e cobrar de novo.
+   */
+  registrar?: (input: {
+    contactId: string | null;
+    values: Record<string, string>;
+    externalId: string | null;
+  }) => Promise<void>;
   /** A nota do número agora. Lida uma vez por rodada, não por mensagem. */
   qualidade: () => Promise<QualidadeDoNumero>;
   /** Espaço entre envios, em ms. */
@@ -180,6 +199,23 @@ export async function rodarCampanha(
           preco_cents: preco ?? 0,
         })
         .eq("id", alvo.id);
+
+      /**
+       * A conversa recebe o envio DEPOIS de marcado e ANTES de cobrar.
+       *
+       * Depois de marcado porque `enviada` é o fato que o resto deriva; antes de
+       * cobrar não importa para o dinheiro (o `cobrar` é idempotente pelo
+       * `ref_id`), mas importa para quem olha: se o processo morrer no meio, é
+       * melhor existir a mensagem sem a linha de débito do que o contrário —
+       * débito sem mensagem é o extrato que ninguém consegue explicar.
+       */
+      if (deps.registrar) {
+        await deps.registrar({
+          contactId: alvo.contact_id ?? null,
+          values: valores,
+          externalId,
+        });
+      }
 
       const ok = await cobrar(db, {
         organizationId: campanha.organization_id,

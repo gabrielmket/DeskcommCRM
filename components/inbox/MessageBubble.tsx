@@ -84,16 +84,31 @@ export function MessageBubble({
   // de `Message` o declara, mas nenhuma linha de app/, lib/ ou workers/ o
   // grava: as ações de automação chamam `sendMessageHandler` com
   // `actor.type === "webhook_source"`, e `_handler.ts` carimba `'ai'` em tudo
-  // que não é `"user"`. Um ramo aqui seria controle decorativo — a tela
-  // prometendo uma distinção que o motor não faz. Carimbar `'automation'` na
-  // origem é decisão de produto com efeito colateral medido (o dedup de eco da
-  // ingestão de canal filtra `sent_via in ('ai','user')`, e o valor novo
-  // duplicaria a mensagem na conversa), então fica para uma issue própria.
+  // que não é `"user"`.
+  //
+  // ── `automation` GANHOU EMISSOR (18/09/2026) ───────────────────────────────
+  //
+  // O MIA Broadcast grava `sent_via: 'automation'` em
+  // `lib/broadcast/registro-na-conversa.ts`: o disparo por template passou a
+  // existir na conversa, e sem um rótulo próprio ele apareceria como se o
+  // agente de IA tivesse escrito — que é exatamente a confusão descrita acima,
+  // agora do lado do disparo.
+  //
+  // O efeito colateral que segurava isto era o dedup de eco, e ele NÃO alcança
+  // este caminho: `ehEcoDeEnvioNosso` vive em `lib/waha/ingest.ts` (outro
+  // canal) e exige `external_id` nulo com status `queued|sending`. A linha do
+  // disparo nasce com o `wamid` da Meta e status `sent` — não casa por três
+  // motivos independentes.
+  //
   // Vigiado nas duas direções por tests/unit/rotulo-de-origem-tem-emissor.
   const senderLabel = (() => {
     if (!isOutbound) return null;
     if (message.sent_via === "ai") return "IA";
     if (message.sent_via === "external_device") return "Celular";
+    // "Campanha" e não "Automação": o que o dono precisa distinguir é que
+    // aquela mensagem saiu de um disparo em lista, não de alguém falando com
+    // ele. O nome da coluna é vocabulário do banco; o rótulo é do leitor.
+    if (message.sent_via === "automation") return "Campanha";
     if (message.sent_via === "user" || message.sent_via === "crm") {
       // "Você" exige as DUAS pontas: saber quem lê e saber quem enviou. Falta
       // qualquer uma, o rótulo cai para "Atendente" — que continua dizendo o

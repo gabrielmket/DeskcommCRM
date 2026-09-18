@@ -23,7 +23,6 @@ import { criarTemplate } from "@/lib/channels/meta/criar-template";
 import { credenciaisDaOrg } from "@/lib/channels/meta/credenciais-da-org";
 import { syncTemplates } from "@/lib/channels/meta/template-sync";
 import { requireSupportWrite } from "@/lib/impersonate/support";
-import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 

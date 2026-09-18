@@ -24,6 +24,8 @@ import { fail, ok } from "@/lib/api/wrappers";
 import { rodarCampanha, type CampanhaEmCurso } from "@/lib/broadcast/motor";
 import { credenciaisDaOrg } from "@/lib/channels/meta/credenciais-da-org";
 import { qualidadeDoNumero } from "@/lib/channels/meta/qualidade-do-numero";
+import { renderTemplateBody } from "@/lib/channels/meta/render-template";
+import { registrarNaConversa } from "@/lib/broadcast/registro-na-conversa";
 import { sendTemplateForSession } from "@/lib/channels/meta/send-template-for-session";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
@@ -77,6 +79,34 @@ async function handler(req: NextRequest): Promise<Response> {
     return ok({ rodou: false, motivo: "sem_canal" }, { requestId });
   }
 
+  /**
+   * O que é preciso para o disparo VIRAR MENSAGEM na conversa.
+   *
+   * Carregado UMA vez por rodada, não por destinatário: os componentes do
+   * template e o canal são os mesmos para a campanha inteira, e buscá-los a
+   * cada envio seria uma ida ao banco por mensagem numa lista de milhares.
+   *
+   * Os dois são opcionais: se faltar qualquer um, o disparo continua saindo e
+   * só deixa de ser registrado (com linha no log). Derrubar uma campanha paga
+   * por causa do espelho local seria trocar um problema de visibilidade por um
+   * de dinheiro.
+   */
+  const [{ data: espelho }, { data: canal }] = await Promise.all([
+    admin
+      .from("meta_templates")
+      .select("components, parameter_format")
+      .eq("organization_id", alvo.organization_id)
+      .eq("name", alvo.template_name)
+      .eq("language", alvo.template_language)
+      .maybeSingle(),
+    admin
+      .from("channel_sessions")
+      .select("id")
+      .eq("organization_id", alvo.organization_id)
+      .eq("meta_phone_number_id", creds.phoneNumberId)
+      .maybeSingle(),
+  ]);
+
   if (alvo.status === "agendada") {
     await admin
       .from("broadcasts")
@@ -90,6 +120,29 @@ async function handler(req: NextRequest): Promise<Response> {
     {
       enviar: (input) =>
         sendTemplateForSession(admin, { ...input, phoneNumberId: creds.phoneNumberId }),
+      registrar:
+        espelho && canal
+          ? async ({ contactId, values, externalId }) => {
+              await registrarNaConversa(admin, {
+                organizationId: alvo.organization_id,
+                contactId,
+                channelSessionId: canal.id as string,
+                // O texto COM as variáveis aplicadas: é o que a pessoa leu, e é
+                // o que explica a resposta dela para quem ler o histórico
+                // depois — inclusive o agente.
+                texto: renderTemplateBody(espelho.components, values, {
+                  name: alvo.template_name,
+                  language: alvo.template_language,
+                  ...(espelho.parameter_format
+                    ? { parameterFormat: espelho.parameter_format as string }
+                    : {}),
+                }),
+                externalId,
+                templateName: alvo.template_name,
+                broadcastId: alvo.id,
+              });
+            }
+          : undefined,
       qualidade: () => qualidadeDoNumero(creds),
       espacar: (ms) => new Promise((r) => setTimeout(r, ms)),
     },
