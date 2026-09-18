@@ -130,6 +130,9 @@ async function marcarFonte(
   }
 }
 
+/** O `kind` do aviso deste worker — a chave de dedup E a de resolução. */
+const KIND_AVISO = "conhecimento_nao_indexado";
+
 /**
  * Abre o aviso na Central. Sem `on conflict`: um aviso por tentativa é
  * ruidoso demais, então só abre quando não há um ABERTO para a mesma fonte.
@@ -154,7 +157,7 @@ async function avisarNaCentral(
 
     await admin.from("agent_inbox_items").insert({
       organization_id: organizationId,
-      kind: "conhecimento_nao_indexado",
+      kind: KIND_AVISO,
       severity: "warn",
       title: titulo,
       body: corpo,
@@ -164,6 +167,53 @@ async function avisarNaCentral(
   } catch (err) {
     console.warn(
       "[rag-indexer] não consegui abrir o aviso na Central",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
+/**
+ * Fecha o aviso quando o material FINALMENTE entra na base.
+ *
+ * ## O defeito, medido em produção (18/09/2026)
+ *
+ * `agent_inbox_items d73a8e56…` estava `open` desde 03:21 enquanto a fonte
+ * referenciada estava `ready` desde 04:22. Ninguém fechava: este worker ABRIA o
+ * aviso e marcava a fonte como pronta ao concluir, sem nenhum update em
+ * `agent_inbox_items`. Não existia função que resolvesse este `kind` — o alerta
+ * era imortal até alguém fechar à mão.
+ *
+ * O custo não é estético. Durante a investigação daquele dia, este alerta levou
+ * a um diagnóstico ERRADO, desmentido só depois de ler `ai_knowledge_sources`
+ * direto: um aviso que sobrevive à condição que o criou não é ruído neutro, é
+ * evidência falsa.
+ *
+ * ## Onde ele fecha, e por que aqui
+ *
+ * No MESMO ponto que o abriria — o fim da indexação —, que é onde se sabe, sem
+ * adivinhar, que a condição acabou. É a regra que `resolverAvisoDeJanela`
+ * (`lib/agent-engine/pacing/aviso-de-janela.ts`) já aplica ao aviso de janela
+ * fechada, e a razão é a mesma: varredura por cron seria um segundo lugar onde a
+ * regra vive, e dois lugares divergem na primeira mudança.
+ *
+ * Fire-and-forget como o resto deste worker: telemetria nunca derruba uma
+ * indexação que já deu certo.
+ */
+async function resolverAvisoDaFonte(organizationId: string, sourceId: string): Promise<void> {
+  try {
+    await createAdminClient()
+      .from("agent_inbox_items")
+      .update({ status: "resolved", resolved_at: new Date().toISOString() })
+      // `service_role` passa por cima da RLS: o filtro de organização é manual.
+      .eq("organization_id", organizationId)
+      .eq("kind", KIND_AVISO)
+      .eq("ref_id", sourceId)
+      // `ack` entra junto: alguém ter LIDO o aviso não é alguém ter resolvido o
+      // problema, e o que resolveu foi a indexação que acabou de passar.
+      .in("status", ["open", "ack"]);
+  } catch (err) {
+    console.warn(
+      "[rag-indexer] não consegui fechar o aviso na Central",
       err instanceof Error ? err.message : String(err),
     );
   }
@@ -563,6 +613,9 @@ export async function processRagIndexer(row: EventRow): Promise<HandlerResult> {
         last_indexed_at: new Date().toISOString(),
         chunks_count: resultado.chunks,
       });
+      // O laço fecha AQUI, no mesmo ponto que o abriu: o material entrou, então
+      // o aviso de "não entrou" deixa de ser verdade neste instante.
+      await resolverAvisoDaFonte(row.organization_id, fonte.id);
       return {
         consumer_key: consumerKey,
         status: "ok",
