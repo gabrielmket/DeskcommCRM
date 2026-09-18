@@ -46,7 +46,13 @@ type Prova =
   | { estado: "problema"; mensagem: string }
   | { estado: "nao_deu" };
 
-export function InteligenciaDele({ inicial }: { inicial: EstadoDaChave }) {
+export function InteligenciaDele({
+  inicial,
+  podeConfigurar,
+}: {
+  inicial: EstadoDaChave;
+  podeConfigurar: boolean;
+}) {
   const t = useT();
   const [chave, setChave] = useState(inicial);
   const [prova, setProva] = useState<Prova | null>(null);
@@ -98,6 +104,18 @@ export function InteligenciaDele({ inicial }: { inicial: EstadoDaChave }) {
       vivo = false;
     };
   }, [temChave]);
+
+  /**
+   * Cliente não vê chave — nem para colar, nem para conferir. A regra e o porquê
+   * moram em `lib/ai/custo-e-da-plataforma.ts`, junto da do custo, porque são a
+   * mesma decisão: a conta do provedor é nossa, e o cliente contratou
+   * atendimento.
+   *
+   * Retornar `null` e não uma mensagem é deliberado: não há nada que ele possa
+   * fazer, e um aviso sobre encanamento alheio só ocuparia o passo mais
+   * importante do onboarding com uma preocupação que não é dele.
+   */
+  if (!podeConfigurar) return null;
 
   if (!temChave) {
     return (

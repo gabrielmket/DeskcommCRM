@@ -287,10 +287,10 @@ export function ConnectWhatsappClient({
       try {
         const res = await fetch("/api/v1/onboarding/whatsapp/session");
         const json = (await res.json()) as { data?: SessionInfo };
-        if (json.data) {
-          setInfo(json.data);
-          if (json.data.status === "SCAN_QR_CODE") setQrTick((t) => t + 1);
-        }
+        if (json.data) setInfo(json.data);
+        // O `qrTick` NÃO é tocado aqui de propósito: ver o efeito próprio logo
+        // abaixo. Este laço roda a cada 3s para perceber a conexão depressa, e
+        // recarregar o código nesse ritmo é o que o fazia piscar sem parar.
         // Falha de leitura durante a espera NÃO é transitória quando se
         // repete: sem isto, a tela seguia em "preparando" enquanto toda
         // tentativa falhava.
@@ -311,6 +311,29 @@ export function ConnectWhatsappClient({
     }, 3000);
     return () => clearInterval(id);
   }, [forma, wahaConfigured, status, sessionName, t]);
+
+  /**
+   * O CÓDIGO TEM O PRÓPRIO RELÓGIO — e essa separação é o conserto.
+   *
+   * Antes, `qrTick` subia a cada resposta do polling de status, que roda de 3
+   * em 3 segundos. Como ele ia no `key` E na `src` da imagem, cada volta
+   * DESTRUÍA o elemento e rebaixava o arquivo: a caixa ficava branca, voltava,
+   * ficava branca de novo. O efeito prático é que não dava para escanear —
+   * o celular precisa do código parado por alguns segundos.
+   *
+   * O erro estava no gatilho, não na ideia: invalidar o cache é necessário
+   * porque o WAHA gira o código por trás na mesma URL. Só que ele gira a cada
+   * ~20 segundos, não a cada 3. Agora o status é perguntado depressa (para a
+   * conexão ser percebida na hora) e o código é recarregado no ritmo em que ele
+   * de fato muda.
+   */
+  useEffect(() => {
+    if (forma !== "qr") return;
+    if (!wahaConfigured) return;
+    if (status !== "SCAN_QR_CODE") return;
+    const id = setInterval(() => setQrTick((t) => t + 1), 20_000);
+    return () => clearInterval(id);
+  }, [forma, wahaConfigured, status]);
 
   // 3) When status → WORKING, auto-advance.
   useEffect(() => {
@@ -467,8 +490,11 @@ export function ConnectWhatsappClient({
                 </p>
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
+                // Sem `key`: mudar a `src` já rebaixa a imagem, e manter o
+                // MESMO elemento faz o navegador só trocar o conteúdo quando o
+                // novo termina de carregar. Com `key`, o React destruía o nó e
+                // a área ficava branca no meio do caminho — o pisca.
                 <img
-                  key={qrTick}
                   src={`/api/v1/onboarding/whatsapp/qr?t=${qrTick}`}
                   alt={t("Código QR para conectar o WhatsApp")}
                   className="h-48 w-48 rounded-md border bg-white object-contain sm:h-56 sm:w-56"

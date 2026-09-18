@@ -9,6 +9,7 @@ import { capacidadesPadraoDoOnboarding } from "@/lib/ai/agents/capacidades-padra
 import { TOOL_CATALOG } from "@/lib/mcp/tools/catalog";
 import { CONFERENCIAS_DE_SAIDA } from "@/lib/ai/guardrails/lista-de-conferencia";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { podeConfigurarChaveDeIa } from "@/lib/ai/custo-e-da-plataforma";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,7 @@ export default async function SetupAiPage() {
         a chave passa a importar — um clique antes de ele ser criado com ela.
       */}
       <InteligenciaDele
+        podeConfigurar={podeConfigurarChaveDeIa(user)}
         inicial={{
           origem: retrato.inteligencia.origemDaChave,
           provedor: retrato.inteligencia.provedor,

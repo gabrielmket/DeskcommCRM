@@ -27,6 +27,30 @@ export function podeVerCusto(user: Pick<AuthUser, "is_platform_admin" | "support
 }
 
 /**
+ * A CHAVE segue a mesma regra do CUSTO, e pelo mesmo motivo.
+ *
+ * Se o cliente contrata atendimento e não tokens, pedir a chave da OpenAI a ele
+ * no onboarding contradiz o que ele comprou — e entrega, de quebra, uma
+ * configuração que ele não tem como resolver: quando falta chave numa
+ * instalação gerenciada, quem precisa agir somos nós, no `/admin`. Mostrar o
+ * campo ali transforma uma pendência nossa em dever de casa do cliente, e a
+ * tela fica oferecendo um beco.
+ *
+ * O ponteiro da instalação (`origem: "instalacao"`) é ainda pior de expor: são
+ * os últimos dígitos da NOSSA chave e o estado de crédito da NOSSA conta,
+ * dentro da tela de quem comprou atendimento.
+ *
+ * Quem continua vendo é o admin de plataforma — e é ele quem instala num
+ * self-host, então o caminho de quem roda por conta própria não se perde.
+ * `support` fica de fora pela mesma razão do custo: acompanhar não é operar.
+ */
+export function podeConfigurarChaveDeIa(
+  user: Pick<AuthUser, "is_platform_admin" | "support">,
+): boolean {
+  return user.is_platform_admin === true && !user.support;
+}
+
+/**
  * Apaga o custo de cada linha quando quem pede não é da plataforma. Devolve
  * `null` (o mesmo valor que "preço desconhecido" já produzia), e não zero: a
  * tela existente esconde a linha de custo quando é nulo, e um zero ali diria
