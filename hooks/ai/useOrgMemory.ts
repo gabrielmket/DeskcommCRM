@@ -1,6 +1,7 @@
 "use client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
+import type { OrigemDaMemoria } from "@/lib/ai/org-memory-source";
 
 export interface OrgMemoryDocument {
   version_id: string;
@@ -17,7 +18,7 @@ export interface OrgMemoryEntryRow {
   id: string;
   title: string;
   body: string;
-  source: "manual" | "flywheel";
+  source: OrigemDaMemoria;
   status: "active" | "archived";
   created_at: string;
 }

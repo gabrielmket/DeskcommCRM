@@ -2146,6 +2146,7 @@ export const DICIONARIO: Traducoes = {
   "a maioria responde em": { es: "la mayoría responde en" },
   "agora usa": { es: "ahora usa" },
   "aprendido automaticamente": { es: "aprendido automáticamente" },
+  "anotado pela IA": { es: "anotado por la IA" },
   ativa: { es: "activa" },
   "atualizada em": { es: "actualizada el" },
   caracteres: { es: "caracteres" },

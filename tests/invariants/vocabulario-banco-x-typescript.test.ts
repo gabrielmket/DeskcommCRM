@@ -288,6 +288,20 @@ const PARES: Array<{
     arquivo: "lib/agent-engine/queue/queue.ts",
     simbolo: "MOTIVOS_DE_ADIAMENTO",
   },
+  {
+    tabela: "org_memory_entries",
+    coluna: "source",
+    // lib/ai/org-memory-source.ts → ORIGENS_DA_MEMORIA (tupla `as const`).
+    //
+    // Este par nasce de uma divergência que já estava em produção, e não de
+    // zelo: `crm_save_org_memory` gravava `source: "agent"` desde sempre, e o
+    // CHECK da 0067 só aceitava manual|flywheel. A ferramenta MCP NUNCA
+    // funcionou — todo uso morria em `23514`. É o modo de falha que esta lista
+    // existe para pegar, e ele sobreviveu porque o valor estava escrito como
+    // string literal no handler, sem lista nenhuma para comparar.
+    arquivo: "lib/ai/org-memory-source.ts",
+    simbolo: "ORIGENS_DA_MEMORIA",
+  },
 ];
 
 /** Tira um nível de parênteses externos, se ele envolver a expressão inteira. */

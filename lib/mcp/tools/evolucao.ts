@@ -17,6 +17,7 @@ import {
   buscarConhecimento,
   resolverAcervoDoAgente,
 } from "@/lib/ai/knowledge/busca";
+import type { OrigemDaMemoria } from "@/lib/ai/org-memory-source";
 import type { McpToolDefinition } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -215,7 +216,11 @@ export const crmSaveOrgMemory: McpToolDefinition<typeof gravarMemoriaInputShape>
         organization_id: ctx.organizationId,
         title: input.titulo,
         body: input.corpo,
-        source: "agent",
+        // CONSTANTE COMPARTILHADA, nunca literal: o CHECK de `source` só passou a
+        // aceitar 'agent' na migration 0252, e até lá esta linha — escrita como
+        // string solta — fazia TODA chamada da ferramenta morrer em 23514. O par
+        // com o banco é cobrado pelo invariante de vocabulário.
+        source: "agent" satisfies OrigemDaMemoria,
         status: "active",
       })
       .select("id, title, status, created_at")

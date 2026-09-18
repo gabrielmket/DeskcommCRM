@@ -25123,4 +25123,21 @@ comment on column public.job_queue.deferred_reason is
   'POR QUE este job esta com run_after no futuro, em vocabulario fechado. O texto legivel continua em last_error; esta coluna existe para ser FILTRADA. Par em lib/agent-engine/queue/queue.ts (MOTIVOS_DE_ADIAMENTO), cobrado por tests/invariants/vocabulario-banco-x-typescript.test.ts.';
 
 
+-- ---- memória da org aceita origem 'agent' (migration 0252) ----
+-- `crm_save_org_memory` grava `source: "agent"` e o CHECK da 0067 só aceitava
+-- manual|flywheel: a ferramenta MCP nunca funcionou, morria em 23514 a cada
+-- chamada. Alargar o CHECK e não trocar o handler para 'manual': a coluna existe
+-- para responder QUEM ESCREVEU, e política da empresa é o tipo de texto em que
+-- essa diferença decide se alguém confere antes de obedecer. Alargar é seguro em
+-- banco existente — nenhuma linha viola o conjunto maior.
+alter table public.org_memory_entries
+  drop constraint if exists org_memory_entries_source_check;
+alter table public.org_memory_entries
+  add constraint org_memory_entries_source_check
+  check (source in ('manual', 'flywheel', 'agent'));
+
+comment on column public.org_memory_entries.source is
+  'PROCEDENCIA da anotacao: manual, flywheel (destilacao aprovada) ou agent (a IA anotou sozinha, pela ferramenta MCP crm_save_org_memory). Par em lib/ai/org-memory-source.ts (ORIGENS_DA_MEMORIA).';
+
+
 notify pgrst, 'reload schema';

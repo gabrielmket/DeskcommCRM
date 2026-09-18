@@ -288,8 +288,24 @@ export function OrgMemoryClient({ initialState }: Props) {
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{entry.title}</span>
-                    <Badge variant={entry.source === "flywheel" ? "info" : "neutral"} className="text-[10px]">
-                      {entry.source === "flywheel" ? t("aprendido automaticamente") : t("manual")}
+                    {/*
+                      TRÊS origens, não duas. O ternário anterior mandava tudo que
+                      não fosse `flywheel` para o rótulo "manual" — e desde a 0252
+                      existe `agent`, que é a IA anotando sozinha pela ferramenta
+                      MCP. Chamar isso de "manual" é a mentira que a migration
+                      argumenta contra: esta tela mostra POLÍTICA que todos os
+                      agentes obedecem, e quem lê precisa saber se um humano
+                      assinou. Ver `lib/ai/org-memory-source.ts`.
+                    */}
+                    <Badge
+                      variant={entry.source === "manual" ? "neutral" : "info"}
+                      className="text-[10px]"
+                    >
+                      {entry.source === "flywheel"
+                        ? t("aprendido automaticamente")
+                        : entry.source === "agent"
+                          ? t("anotado pela IA")
+                          : t("manual")}
                     </Badge>
                     <span className="ml-auto text-xs text-muted-foreground">{formatDate(entry.created_at, tagDoIdioma)}</span>
                   </div>
