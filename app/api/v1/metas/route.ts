@@ -17,6 +17,7 @@ import { type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { ok, fail } from "@/lib/api/wrappers";
+import { logger } from "@/lib/logger";
 import { requireRole } from "@/lib/auth/require-role";
 import {
   progressoDaMeta,
@@ -254,6 +255,20 @@ export async function POST(req: NextRequest): Promise<Response> {
     .single();
 
   if (error || !data) {
+    /**
+     * O MOTIVO CRU VAI PARA O LOG — e essa linha é a lição da 0253.
+     *
+     * A rota devolvia só "Não consegui gravar a meta." e descartava o `code`.
+     * Com isso, um `42P10` que reprovava 100% das gravações desde a 0243
+     * sobreviveu em produção: o único lugar onde ele aparecia era um toast, e
+     * toast não é log. A mensagem ao operador continua sendo esta — ela não
+     * ganha nada com jargão do Postgres —, mas o motivo deixa de morrer.
+     */
+    logger.error("[metas] gravação recusada pelo banco", {
+      request_id: requestId,
+      codigo: error?.code ?? null,
+      detalhe: error?.message?.slice(0, 300) ?? null,
+    });
     return fail("db_error", t("Não consegui gravar a meta."), 500, { requestId });
   }
   return ok(data, { requestId });

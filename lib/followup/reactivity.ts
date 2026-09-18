@@ -221,9 +221,47 @@ async function reactToInbound(
 
     if (await acordarPorInbound(db, clock, row, e)) reacted++;
   }
-  // Nó `wait` fica `active` com timer — sem isto a resposta do lead não corta
-  // a espera de 5min (o motor só acordava `waiting_reply`).
+  /**
+   * Nó `wait` fica `active` com timer — sem isto a resposta do lead não corta
+   * a espera de 5min (o motor só acordava `waiting_reply`).
+   *
+   * ⚠️ MAS ACORDAR NÃO PODE VALER PARA QUEM PEDIU PARA PARAR. Medido em
+   * 17/09/2026: o contato escreveu no canal oficial às 20:47:36 e, SEIS
+   * SEGUNDOS depois, recebeu "Vou parar por aqui pra não te incomodar" pelo
+   * outro canal.
+   *
+   * O diagnóstico óbvio — "a régua não viu a resposta porque olha a conversa
+   * errada" — está ERRADO: toda a detecção já é por CONTATO (aqui, em
+   * `aplicar-inbound`, no `silence-sweep` e no gatilho do banco), e de
+   * propósito. O que aconteceu foi o contrário e é pior: a resposta FOI vista,
+   * acordou a espera, e o motor seguiu para o passo seguinte — que era a
+   * despedida. A resposta do lead EMPURROU a régua para se despedir dele.
+   *
+   * Os seis segundos são explicados por o webhook da Meta rodar o pipeline
+   * inline, dentro da própria request, em vez de esperar o cron.
+   *
+   * Então o `cancel_on_reply` passa a valer para os dois estados. Ele já era
+   * consultado logo acima, nos `waiting_reply`; a espera ativa ficou de fora
+   * quando este laço nasceu, e é exatamente nela que mora o nó `wait` que
+   * antecede a despedida. Quem NÃO ligou o knob continua sendo acordado como
+   * antes — isto não muda o padrão, só para de ignorá-lo num dos dois lados.
+   */
   for (const e of esperaAtiva) {
+    if (parseCancelOnReply(e.trigger_config)) {
+      const key = `reactivity:${row.id}:${e.id}:reactivity_replied`;
+      const applied = await applyStep(
+        db,
+        row.organization_id,
+        e,
+        key,
+        "reactivity_replied",
+        { reason: "cancel_on_reply" },
+        cancelPatch(clock, "replied", "cancel_on_reply"),
+      );
+      if (applied) reacted++;
+      continue;
+    }
+
     if (await acordarPorInbound(db, clock, row, e)) reacted++;
   }
   return { matched: true, reacted };

@@ -24483,14 +24483,23 @@ comment on table public.sales_targets is
 
 -- Índice único com as colunas nuláveis normalizadas: sem o coalesce, o Postgres
 -- trata cada NULL como distinto e a mesma meta pode ser cadastrada duas vezes.
-create unique index if not exists idx_sales_targets_unica
-  on public.sales_targets (
-    organization_id,
-    periodo,
-    metrica,
-    coalesce(user_id, '00000000-0000-0000-0000-000000000000'::uuid),
-    coalesce(agent_id, '00000000-0000-0000-0000-000000000000'::uuid)
-  );
+-- ⚠️ NULLS NOT DISTINCT, e a forma importa (migration 0253).
+--
+-- Este índice já foi de EXPRESSÃO (`coalesce(user_id, …)`), com a intenção certa
+-- — NULL tem de casar com NULL — e a forma errada: o `ON CONFLICT` da rota de
+-- metas lista COLUNAS, e o Postgres infere o índice no PLANEJAMENTO. Lista de
+-- colunas não casa com índice de expressão, então TODA gravação de meta morria
+-- em `42P10`, inclusive a primeira numa tabela vazia.
+--
+-- A rota engolia `error.code` e devolvia um toast genérico, então um erro em
+-- 100% das gravações sobreviveu em produção sem aparecer em log nenhum.
+create unique index if not exists idx_sales_targets_unica_nn
+  on public.sales_targets (organization_id, periodo, metrica, user_id, agent_id)
+  nulls not distinct;
+
+-- O nome antigo sai do caminho em bancos que já o têm (o bloco 0253, no fim
+-- deste arquivo, faz o mesmo ao reaplicar).
+drop index if exists public.idx_sales_targets_unica;
 
 create index if not exists idx_sales_targets_org_periodo
   on public.sales_targets (organization_id, periodo desc);
@@ -25139,5 +25148,17 @@ alter table public.org_memory_entries
 comment on column public.org_memory_entries.source is
   'PROCEDENCIA da anotacao: manual, flywheel (destilacao aprovada) ou agent (a IA anotou sozinha, pela ferramenta MCP crm_save_org_memory). Par em lib/ai/org-memory-source.ts (ORIGENS_DA_MEMORIA).';
 
+
+
+-- ---- meta do mês volta a gravar (migration 0253) ----
+--
+-- Para o banco que JÁ EXISTE. O bloco da 0243, acima, já nasce certo — este aqui
+-- é o que conserta quem foi instalado antes. Índice novo primeiro, o antigo
+-- depois: em ordem inversa a tabela ficaria um instante sem trava de duplicidade.
+create unique index if not exists idx_sales_targets_unica_nn
+  on public.sales_targets (organization_id, periodo, metrica, user_id, agent_id)
+  nulls not distinct;
+
+drop index if exists public.idx_sales_targets_unica;
 
 notify pgrst, 'reload schema';
