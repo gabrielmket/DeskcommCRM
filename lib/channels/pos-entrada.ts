@@ -118,6 +118,7 @@ export async function aplicarEfeitosPosEntrada(
   await aplicarOptOut(admin, entrada);
   await abrirDemanda(admin, entrada);
   await avaliarCampanha(admin, entrada);
+  await fecharAvisoDeSilencio(admin, entrada);
   // A resposta do lead avança o follow-up AQUI. O despacho do agente (LLM)
   // vem depois: no Hobby ele estoura o tempo da request e o próximo texto
   // do fluxo ficava esperando o relógio.
@@ -128,6 +129,54 @@ export async function aplicarEfeitosPosEntrada(
     texto: entrada.texto,
   });
   await pedirDespachoDoAgente(admin, entrada);
+}
+
+/**
+ * 2a · O AVISO DE "LEAD NÃO RESPONDEU NO PRAZO" MORRE QUANDO ELE RESPONDE.
+ *
+ * `snooze_expired` é aberto pelo cron `snooze-watcher` quando o prazo do
+ * lembrete vence e o lead não deu sinal. A condição se desfaz sozinha e pelo
+ * caminho DESEJADO — o lead responder, ainda que atrasado — e nada fechava o
+ * item: nem responder, nem encerrar a conversa, nem arquivá-la.
+ *
+ * O resultado é o pior tipo de mural: o operador vê "Lead não respondeu no
+ * prazo" para alguém que está conversando com ele naquele instante. Depois de
+ * duas ou três dessas, ele para de olhar a Central — e aí o aviso que importa
+ * também não é visto.
+ *
+ * Resolver AQUI, no ponto que a resposta chega, e não por um segundo varredor:
+ * o varredor precisaria redescobrir "o lead respondeu?", que é exatamente o
+ * fato que esta função já tem em mãos. É o mesmo desenho de
+ * `resolverAvisoDeJanela` e do conserto do `conhecimento_nao_indexado`.
+ *
+ * Best-effort: telemetria nunca derruba a entrada de uma mensagem de cliente.
+ */
+async function fecharAvisoDeSilencio(admin: Admin, entrada: EntradaDeMensagem): Promise<void> {
+  if (!entrada.conversationId) return;
+  /**
+   * try/catch e não só o `error` do retorno: um THROW aqui abortaria
+   * `aplicarEfeitosPosEntrada` inteiro e levaria junto o despacho do agente —
+   * uma falha de telemetria calando a resposta ao cliente. O contrato deste
+   * arquivo é que a mensagem entra de qualquer jeito.
+   */
+  try {
+    const { error } = await admin
+      .from("agent_inbox_items")
+      .update({ status: "resolved", resolved_at: new Date().toISOString() })
+      .eq("organization_id", entrada.organizationId)
+      .eq("kind", "snooze_expired")
+      .eq("ref_kind", "conversation")
+      .eq("ref_id", entrada.conversationId)
+      .eq("status", "open");
+    if (error) {
+      console.warn("[pos-entrada] aviso de silêncio não foi resolvido", error.message);
+    }
+  } catch (err) {
+    console.warn(
+      "[pos-entrada] aviso de silêncio não foi resolvido",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
 }
 
 /**

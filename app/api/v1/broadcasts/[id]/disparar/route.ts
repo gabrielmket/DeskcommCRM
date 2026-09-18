@@ -13,6 +13,7 @@
 import { randomUUID } from "node:crypto";
 
 import { type NextRequest } from "next/server";
+import { z } from "zod";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
@@ -26,8 +27,24 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * O corpo é OPCIONAL, e é o que separa "disparar" de "agendar".
+ *
+ * Sem corpo, tudo segue como sempre: sai agora. Com `agendado_para`, a campanha
+ * vai para `agendada` e o worker a pega quando a hora chegar — a coluna, o
+ * status e o índice parcial já existiam desde a 0247, esperando alguém que os
+ * criasse. O worker já trata `status: 'agendada'` e `agendado_para <= now()`;
+ * o que faltava era exatamente esta porta.
+ */
+const corpoSchema = z
+  .object({
+    /** ISO-8601. Ausente ou nulo = agora, que é o comportamento de sempre. */
+    agendado_para: z.string().datetime({ offset: true }).nullish(),
+  })
+  .nullish();
+
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const bloqueioDeSuporte = await requireSupportWrite();
@@ -40,6 +57,23 @@ export async function POST(
   const db = await createClient();
   if (!(await moduloLiberado(db, authz.org.orgId, "disparador"))) {
     return fail("forbidden", "Módulo não contratado.", 403, { requestId });
+  }
+
+  const parsed = corpoSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return fail("validation_failed", "Agendamento inválido.", 422, { requestId });
+  }
+  const quando = parsed.data?.agendado_para ?? null;
+
+  /**
+   * Hora no PASSADO é recusada, e não "corrigida" para agora.
+   *
+   * Aceitar caladamente faria a tela dizer "agendado para ontem" e a campanha
+   * sair na hora — que é o oposto do que quem digitou a data esperava. Um
+   * minuto de tolerância absorve o relógio do navegador adiantado.
+   */
+  if (quando && new Date(quando).getTime() < Date.now() - 60_000) {
+    return fail("validation_failed", "A hora escolhida já passou.", 422, { requestId });
   }
 
   const { id } = await ctx.params;
@@ -107,11 +141,21 @@ export async function POST(
   await admin
     .from("broadcasts")
     .update({
-      status: "enviando",
-      // O preço é congelado AQUI: é o acordado no momento do disparo, e é ele
-      // que o relatório desta campanha vai usar para sempre.
+      status: quando ? "agendada" : "enviando",
+      agendado_para: quando,
+      /**
+       * O preço é congelado AQUI, inclusive quando agenda.
+       *
+       * É o acordado no momento em que a pessoa MANDOU disparar, e é ele que o
+       * relatório desta campanha vai usar para sempre. Congelar no envio faria
+       * uma campanha marcada para sexta sair pelo preço de sexta — e quem
+       * autorizou autorizou o de hoje.
+       */
       preco_cents: precoCents,
-      iniciado_em: agora,
+      // `iniciado_em` é quando COMEÇOU a sair, não quando foi autorizada: a
+      // campanha agendada ainda não começou, e carimbar agora faria o relatório
+      // contar como iniciada uma campanha que não mandou nada.
+      iniciado_em: quando ? null : agora,
       motivo_da_parada: null,
       updated_at: agora,
     })
@@ -122,10 +166,18 @@ export async function POST(
     actorUserId: authz.user.id,
     organizationId: authz.org.orgId,
     requestId,
-    metadata: { broadcast_id: id, destinatarios: count ?? 0, preco_cents: precoCents },
+    metadata: {
+      broadcast_id: id,
+      destinatarios: count ?? 0,
+      preco_cents: precoCents,
+      agendado_para: quando,
+    },
   });
 
   // O envio em si é do cron (a cada minuto): responder "enviando" e sair é o
   // que evita uma requisição HTTP segurando 4.000 mensagens.
-  return ok({ id, status: "enviando", na_fila: count ?? 0 }, { requestId });
+  return ok(
+    { id, status: quando ? "agendada" : "enviando", agendado_para: quando, na_fila: count ?? 0 },
+    { requestId },
+  );
 }

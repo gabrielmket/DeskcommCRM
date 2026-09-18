@@ -48,7 +48,41 @@ Detalhe e evidências em `docs/audits/2026-09-18-pacing-janela-adiada-e-alertas-
 |---|---|---|---|
 | B2-1 | **Alargar a janela reprograma turno adiado** (+ motivo do adiamento em coluna própria) | médio | é o único que deixa o produto sem saída pela tela; consertá-lo também fecha o alerta de janela |
 | B2-2 | **Gatilho de `updated_at` em `channel_knobs`** | minúsculo | hoje o campo mente com cara de verdade e faz a próxima investigação recomeçar enganada |
-| B2-3 | **Resolver `conhecimento_nao_indexado` ao indexar** + varrer quem fecha cada `kind` de alerta | pequeno | dois de dois auditados tinham problema |
+| B2-3 | ~~Resolver `conhecimento_nao_indexado`~~ + ~~varredura dos `kind`~~ | — | feito em 18/09 — resultado abaixo |
+
+### O resultado da varredura (18/09): 19 de 26 alertas não têm quem os feche
+
+Auditados todos os `kind` de `agent_inbox_items`. **Só 7 são resolvidos por
+algum caminho automático.** Os outros 19 ficam abertos até alguém fechar à mão —
+e a maioria tem condição que se desfaz sozinha, então o aviso passa a mentir.
+
+**Consertados em 18/09** (a condição se desfaz e agora o aviso morre junto):
+
+- `handoff` — fecha ao devolver o atendimento à IA. ⚠️ Era o mais grave de
+  todos: a chave de dedup de quem ABRE exige que não haja item aberto para
+  aquele contato, então o aviso velho **calava o handoff novo e real**.
+- `snooze_expired` — fecha quando o lead responde, ainda que atrasado.
+- `conhecimento_nao_indexado` — fechado no ramo de sucesso da indexação.
+
+**Ainda abertos, por gravidade:**
+
+| gravidade | kinds |
+|---|---|
+| **alta** | `midia_nao_lida`, `channel_template_review`, `channel_number_alert` (fecha só em parte), `promise_unfulfilled`, `job_dead`, `next_action_ambiguous`, `reactivation_expired`, `capabilities_missing` |
+| **média** | `voice_call_missed`, `event_dead`, `followup_dead`, `promotion_review`, `risk_backlog_seeded` |
+| **baixa** | `message_send_stuck`, `contact_proposal_expired`, `judge_unaligned` |
+
+Dois casos merecem nota própria:
+
+- **`job_dead`** — o cabeçalho de `queue.ts` registra um incidente real desta
+  VPS: 49 jobs mortos numa rajada de segundos por limite de taxa da OpenAI. O
+  limite cede em minutos; os 49 avisos críticos ficam para sempre. E `dead` é
+  terminal — nada ressuscita o job, então nem existe a ação que fecharia o item.
+  Precisa de decisão: agrupar por causa, expirar sozinho, ou virar outra coisa.
+- **`event_dead`** — o oposto do órfão: declarado no CHECK, com rótulo de tela
+  e orientação ao operador, e **ninguém o emite**. O dead-letter real
+  (`drain.ts`) só faz `log.error`. Um evento que morre em definitivo não deixa
+  uma linha na Central. A tela promete um aviso que nunca chega.
 
 ## Bloco C — Empresa (o CRM virar B2B de verdade)
 
@@ -92,6 +126,7 @@ inbox, janela de 24h e agente intocados.
 | E3 | **Aba "Equipe"** do admin | médio | placeholder declarado na navegação e nunca construído |
 | E4 | **Ligar agregação de logs** na VPS | pequeno | Loki está zerado; sem log do servidor, defeito em produção é diagnosticado por eliminação |
 | E5 | ~~Desligar o workflow `release`~~ | — | feito em 18/09 |
+| E7 | **A página legal nomeia o CLIENTE como controlador** | pequeno | `lib/legal/operador.ts` lê a organização ATIVA da sessão. Num self-host (uma instalação, um operador) está certo; no modelo gerenciado as organizações são CLIENTES, e o operador é sempre a Time Company. Aberta com a Academia Reativa selecionada, `/legal/privacy` declara que a Reativa controla os dados da instalação. Mesma família do custo de IA e da chave: a suposição de operador único não vale aqui. O operador deveria vir de `platform_branding`, não da sessão. |
 | E6 | **MCP de administração da plataforma** | médio | hoje implantar cliente é tela por tela; especificação fica para quando o item subir |
 
 Sobre o E6, pedido do Gabriel em 18/09. O que já se sabe do desenho:

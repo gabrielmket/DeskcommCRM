@@ -140,11 +140,17 @@ export function useEditarCampanha() {
 export function useDispararCampanha() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) =>
-      apiClient.post<{ data: { id: string; status: string; na_fila: number } }>(
-        `/api/v1/broadcasts/${id}/disparar`,
-        {},
-      ),
+    /**
+     * Sem `quando`, dispara agora — o comportamento de sempre. Com `quando`,
+     * a campanha vai para `agendada` e o cron a pega na hora marcada.
+     */
+    mutationFn: async (input: string | { id: string; quando: string }) => {
+      const id = typeof input === "string" ? input : input.id;
+      const corpo = typeof input === "string" ? {} : { agendado_para: input.quando };
+      return apiClient.post<{
+        data: { id: string; status: string; agendado_para: string | null; na_fila: number };
+      }>(`/api/v1/broadcasts/${id}/disparar`, corpo);
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["broadcasts"] });
       // O saldo cai junto com o disparo; sem isto a tela de Créditos mentiria.

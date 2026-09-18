@@ -53,6 +53,8 @@ export function CartaoDaCampanha({
    * estado que espelhasse a campanha não saberia distinguir as duas coisas.
    */
   const [edicao, setEdicao] = useState<{ template: string; tags: string[] } | null>(null);
+  /** `null` = não está agendando. String = o valor do `datetime-local`. */
+  const [agendando, setAgendando] = useState<string | null>(null);
   const { data: templatesRes } = useTemplates();
   const aprovados = (templatesRes?.data.templates ?? []).filter((x) => x.status === "APPROVED");
 
@@ -111,6 +113,12 @@ export function CartaoDaCampanha({
         {c.andamento.pendente ?? 0} {t("na fila")}
       </p>
 
+      {c.status === "agendada" && c.agendado_para ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {t("Sai em")} {new Date(c.agendado_para).toLocaleString(tag)}
+        </p>
+      ) : null}
+
       {c.motivo_da_parada ? (
         <p className="mt-1 text-xs text-warning-fg">
           {t(motivo[c.motivo_da_parada] ?? c.motivo_da_parada)}
@@ -137,6 +145,26 @@ export function CartaoDaCampanha({
             }
           >
             {ehRascunho ? t("Disparar agora") : t("Retomar")}
+          </Button>
+        ) : null}
+
+        {/*
+          AGENDAR é DISPARAR COM HORA — mesma rota, mesmas travas.
+
+          A coluna, o status e o índice parcial existiam desde a 0247, e o worker
+          já tratava `agendada`: faltava só quem criasse uma. Era peça pronta e
+          nunca ligada, a terceira encontrada neste módulo.
+
+          Só para rascunho: campanha que já começou a sair não volta a ser
+          "para depois".
+        */}
+        {ehRascunho ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setAgendando((v) => (v === null ? "" : null))}
+          >
+            {agendando === null ? t("Agendar") : t("Cancelar agendamento")}
           </Button>
         ) : null}
 
@@ -189,6 +217,51 @@ export function CartaoDaCampanha({
           </>
         ) : null}
       </div>
+
+      {agendando !== null ? (
+        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-md border border-border/60 bg-muted/30 p-3">
+          <div className="space-y-1">
+            <Label className="text-xs" htmlFor={`quando-${c.id}`}>
+              {t("Disparar em")}
+            </Label>
+            <Input
+              id={`quando-${c.id}`}
+              type="datetime-local"
+              className="h-9"
+              value={agendando}
+              onChange={(e) => setAgendando(e.target.value)}
+            />
+          </div>
+          <Button
+            size="sm"
+            disabled={!agendando || disparar.isPending}
+            onClick={() =>
+              disparar.mutate(
+                // `datetime-local` devolve hora LOCAL sem fuso; o `Date` do
+                // navegador a interpreta no fuso de quem está olhando, que é o
+                // que a pessoa quis dizer ao digitar. O ISO com deslocamento é
+                // o que a rota valida.
+                { id: c.id, quando: new Date(agendando).toISOString() },
+                {
+                  onSuccess: () => {
+                    setAgendando(null);
+                    toast.success(t("Campanha agendada."));
+                  },
+                  onError: (e: unknown) =>
+                    toast.error(e instanceof Error ? e.message : t("Não consegui agendar.")),
+                },
+              )
+            }
+          >
+            {t("Confirmar agendamento")}
+          </Button>
+          <p className="w-full text-xs text-muted-foreground">
+            {t(
+              "O crédito e a aprovação do template são conferidos agora E de novo na hora do envio — entre uma coisa e outra, outro disparo pode ter consumido o saldo.",
+            )}
+          </p>
+        </div>
+      ) : null}
 
       {/*
         EDITAR = TROCAR O TEMPLATE E REMONTAR A LISTA.

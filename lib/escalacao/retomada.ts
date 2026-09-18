@@ -168,6 +168,44 @@ export async function devolverAtendimentoAoAgente(
     }
   }
 
+  /**
+   * (3a) O AVISO DE HANDOFF MORRE AQUI — no caminho que desfaz a condição.
+   *
+   * Sem isto, a pessoa assume a conversa, atende, encerra, devolve o comando à
+   * IA — e o alerta crítico "assumir a conversa" continua aceso na Central,
+   * apontando para um episódio que acabou.
+   *
+   * ⚠️ E o estrago não é só ruído. A chave de deduplicação de quem ABRE o aviso
+   * (`human-handoff.ts` e `handoff/orchestrator.ts`) exige que NÃO exista item
+   * aberto para aquele contato. Enquanto o aviso velho fica pendurado, um
+   * handoff NOVO e real do mesmo contato não abre aviso nenhum: o item morto
+   * cala o alarme seguinte. É a diferença entre uma tela suja e uma tela que
+   * esconde.
+   *
+   * Mesmo desenho de `resolverAvisoDeJanela`: resolve no ponto que desfaz a
+   * condição, e não por varredura. Varredura precisaria redescobrir "acabou?",
+   * que é justamente o que esta função acabou de decidir.
+   *
+   * Falha aqui NÃO derruba a devolução: as três travas já foram soltas, e
+   * recusar agora deixaria o atendimento preso por causa de um aviso.
+   */
+  if (conv.contact_id !== null) {
+    const { error: avisoErr } = await supabase
+      .from("agent_inbox_items")
+      .update({ status: "resolved", resolved_at: new Date().toISOString() })
+      .eq("organization_id", organizationId)
+      .eq("kind", "handoff")
+      .eq("ref_kind", "contact")
+      .eq("ref_id", conv.contact_id)
+      .eq("status", "open");
+    if (avisoErr) {
+      logger.warn("[escalacao.retomada] aviso de handoff não foi resolvido", {
+        conversation_id: input.conversationId,
+        error: avisoErr.message,
+      });
+    }
+  }
+
   // (3b) ELEGIBILIDADE: devolver o atendimento à IA é uma decisão humana
   // explícita — no gate `allowlist`, é ela que RE-AUTORIZA o contato. Sem isto,
   // o botão "devolver ao automático" apagaria as três travas de handoff e a IA

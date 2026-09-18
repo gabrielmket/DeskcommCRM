@@ -72,7 +72,16 @@ const admin = {
   from(tabela: string) {
     return {
       update(payload: Record<string, unknown>) {
-        ultimoUpdate = payload;
+        /**
+         * Só `contacts` alimenta `ultimoUpdate`.
+         *
+         * O caminho pós-entrada passou a resolver o aviso `snooze_expired`
+         * (`agent_inbox_items`) quando o lead responde. Sem este recorte, a
+         * escrita do aviso viraria "o último update" e os casos de opt-out
+         * passariam a inspecionar a tabela errada — reprovando um bloqueio que
+         * de fato aconteceu.
+         */
+        if (tabela === "contacts") ultimoUpdate = payload;
         return cadeia(`update:${tabela}`);
       },
     };
