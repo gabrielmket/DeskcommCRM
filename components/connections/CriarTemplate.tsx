@@ -27,6 +27,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -65,11 +66,45 @@ export function CriarTemplate() {
   const [exemplos, setExemplos] = useState<string[]>([]);
   const [rodape, setRodape] = useState("");
   const [botaoSair, setBotaoSair] = useState(true);
+  /**
+   * O cabeçalho de mídia, DEPOIS de subido. Guardar o handle e não o arquivo é
+   * deliberado: o upload acontece ao escolher, então quem fecha e reabre o
+   * formulário não sobe de novo, e o botão de enviar nunca espera transferência.
+   */
+  const [midia, setMidia] = useState<{
+    formato: "IMAGE" | "VIDEO" | "DOCUMENT";
+    handle: string;
+    nome: string;
+  } | null>(null);
+  const [subindo, setSubindo] = useState(false);
   const criar = useCriarTemplate();
 
   const quantas = variaveis(corpo);
   const nomeInvalido = nome.length > 0 && !nomeOk(nome);
   const faltamExemplos = quantas > exemplos.filter((e) => e?.trim()).length;
+
+  async function escolherMidia(arquivo: File) {
+    setSubindo(true);
+    try {
+      const fd = new FormData();
+      fd.set("file", arquivo);
+      const r = await fetch("/api/v1/channels/templates/midia", { method: "POST", body: fd });
+      const corpo = (await r.json()) as {
+        data?: { handle: string; formato: "IMAGE" | "VIDEO" | "DOCUMENT" };
+        error?: { message?: string };
+      };
+      if (!r.ok || !corpo.data) {
+        // A mensagem da rota é específica (tipo aceito, tamanho, canal ausente)
+        // e é ela que o operador precisa ler — não um "falhou" genérico.
+        toast.error(corpo.error?.message ?? t("Não consegui subir o arquivo."));
+        return;
+      }
+      setMidia({ ...corpo.data, nome: arquivo.name });
+      toast.success(t("Imagem pronta para a análise da Meta."));
+    } finally {
+      setSubindo(false);
+    }
+  }
 
   function enviar() {
     if (!nome.trim() || !corpo.trim()) {
@@ -93,6 +128,7 @@ export function CriarTemplate() {
         exemplos: exemplos.slice(0, quantas).map((e) => e.trim()),
         botoes: botaoSair ? ["Parar promoções"] : undefined,
         footer: rodape.trim() || undefined,
+        ...(midia ? { header_midia: { formato: midia.formato, handle: midia.handle } } : {}),
       },
       {
         onSuccess: () => {
@@ -102,6 +138,7 @@ export function CriarTemplate() {
           setCorpo("");
           setExemplos([]);
           setRodape("");
+          setMidia(null);
         },
         onError: (e: unknown) => {
           toast.error(e instanceof Error ? e.message : t("Não consegui criar o template."));
@@ -197,6 +234,56 @@ export function CriarTemplate() {
                 ))}
               </div>
             ) : null}
+
+            {/*
+              CABEÇALHO DE IMAGEM — o que o template ganha de visual.
+
+              O arquivo sobe AO ESCOLHER, não ao enviar o formulário: são dois
+              tempos muito diferentes (uma transferência e uma chamada), e
+              juntá-los faria uma imagem grande segurar o envio sem ninguém
+              saber em qual dos dois está esperando.
+
+              ⚠️ A frase abaixo existe porque a confusão é garantida: esta
+              imagem é a AMOSTRA que a Meta revisa, não a que o cliente recebe.
+              A de cada campanha é escolhida na hora de disparar, e pode mudar.
+            */}
+            <div className="space-y-1">
+              <Label htmlFor="tpl-midia">{t("Imagem do topo (opcional)")}</Label>
+              {midia ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-2 py-1.5">
+                  <span className="text-xs">{midia.nome}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {midia.formato}
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto"
+                    onClick={() => setMidia(null)}
+                  >
+                    {t("Remover")}
+                  </Button>
+                </div>
+              ) : (
+                <Input
+                  id="tpl-midia"
+                  type="file"
+                  accept="image/jpeg,image/png,video/mp4,application/pdf"
+                  disabled={subindo}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void escolherMidia(f);
+                  }}
+                />
+              )}
+              <p className="text-xs text-muted-foreground">
+                {subindo
+                  ? t("Subindo…")
+                  : t(
+                      "É só a amostra que a Meta analisa — a imagem de cada campanha você escolhe na hora de disparar. JPG, PNG, MP4 ou PDF, até 5 MB.",
+                    )}
+              </p>
+            </div>
 
             <div className="space-y-1">
               <Label htmlFor="tpl-rodape">{t("Rodapé (opcional)")}</Label>

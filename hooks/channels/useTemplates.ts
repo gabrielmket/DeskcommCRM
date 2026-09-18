@@ -64,6 +64,12 @@ export function useSyncTemplates() {
   });
 }
 
+export interface CabecalhoDeMidia {
+  formato: "IMAGE" | "VIDEO" | "DOCUMENT";
+  /** Devolvido por POST /channels/templates/midia — a AMOSTRA, não a imagem enviada. */
+  handle: string;
+}
+
 export interface NovoTemplateInput {
   name: string;
   language: string;
@@ -73,6 +79,7 @@ export interface NovoTemplateInput {
   botoes?: string[];
   header?: string;
   footer?: string;
+  header_midia?: CabecalhoDeMidia;
 }
 
 /**

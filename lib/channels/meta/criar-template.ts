@@ -44,6 +44,18 @@ export interface NovoTemplate {
   botoes?: string[];
   /** Texto curto no topo. Opcional, e sem variável de propósito (ver abaixo). */
   header?: string;
+  /**
+   * Cabeçalho de MÍDIA, alternativo ao de texto.
+   *
+   * `handle` é o que `subirMidiaDoTemplate` devolve — não é URL nem arquivo, e
+   * não é a imagem que o cliente recebe: é a AMOSTRA que a Meta usa para
+   * revisar o modelo. A imagem de cada envio vai no parâmetro do cabeçalho, na
+   * hora de disparar, e pode ser diferente a cada campanha.
+   *
+   * Texto e mídia são EXCLUSIVOS: a Meta aceita um `HEADER` só. Quando os dois
+   * vêm, a mídia vence — é a escolha mais específica de quem preencheu.
+   */
+  headerMidia?: { formato: "IMAGE" | "VIDEO" | "DOCUMENT"; handle: string };
   /** Rodapé curto. A Meta não aceita variável aqui. */
   footer?: string;
 }
@@ -80,7 +92,18 @@ export function variaveisDoCorpo(body: string): number {
 export function componentesDaMeta(t: NovoTemplate): Array<Record<string, unknown>> {
   const componentes: Array<Record<string, unknown>> = [];
 
-  if (t.header?.trim()) {
+  if (t.headerMidia) {
+    /**
+     * O exemplo vai em `header_handle`, e é uma LISTA — mesmo com um arquivo só.
+     * A Meta recusa o valor solto, e o erro fala de "example" sem dizer que o
+     * problema é a forma. É o mesmo tropeço do `body_text` logo abaixo.
+     */
+    componentes.push({
+      type: "HEADER",
+      format: t.headerMidia.formato,
+      example: { header_handle: [t.headerMidia.handle] },
+    });
+  } else if (t.header?.trim()) {
     componentes.push({ type: "HEADER", format: "TEXT", text: t.header.trim() });
   }
 

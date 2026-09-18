@@ -34,6 +34,16 @@ const corpoSchema = z.object({
   exemplos: z.array(z.string().max(200)).max(10).optional(),
   botoes: z.array(z.string().min(1).max(25)).max(3).optional(),
   header: z.string().max(60).optional(),
+  /**
+   * Cabeçalho de mídia. O `handle` vem de POST /channels/templates/midia — é a
+   * AMOSTRA que a Meta revisa, não a imagem que o cliente recebe.
+   */
+  header_midia: z
+    .object({
+      formato: z.enum(["IMAGE", "VIDEO", "DOCUMENT"]),
+      handle: z.string().min(1).max(2048),
+    })
+    .optional(),
   footer: z.string().max(60).optional(),
 });
 
@@ -66,7 +76,12 @@ export async function POST(req: NextRequest): Promise<Response> {
     return fail("invalid_request", "Nenhum canal oficial conectado.", 400, { requestId });
   }
 
-  const r = await criarTemplate({ ...parsed.data, ...creds });
+  const { header_midia, ...dados } = parsed.data;
+  const r = await criarTemplate({
+    ...dados,
+    ...(header_midia ? { headerMidia: header_midia } : {}),
+    ...creds,
+  });
   if (!r.criado) {
     // 422 e não 502 para as recusas nossas: `nome_invalido` e
     // `exemplos_faltando` são do pedido, e um 502 mandaria o operador procurar
