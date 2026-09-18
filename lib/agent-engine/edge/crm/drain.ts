@@ -375,13 +375,33 @@ async function processEvent(
 
   // Coalescência: já existe job PENDING futuro deste contato → esta mensagem
   // entra de carona (o turno lê o histórico completo). Evento vira done.
+  //
+  // ⚠️ DUAS CERCAS, e nenhuma é zelo — cada uma fecha um ralo medido.
+  //
+  // (a) HORIZONTE. A carona só é carona enquanto o job que a leva sai LOGO. A
+  //     condição era `run_after > now()`, que não distingue um job adiado por
+  //     300 ms de debounce — o propósito desta peça — de um adiado por CINCO
+  //     HORAS pela janela anti-ban (`inbound-turn.ts`, bloco "JANELA ANTI-BAN").
+  //     Enquanto a janela está fechada, TODA mensagem seguinte do contato caía
+  //     aqui: evento marcado `done`, nenhum job novo, e o cliente atendido por um
+  //     único turno lá na frente. O teto é o próprio debounce, que é a janela que
+  //     esta peça existe para cobrir.
+  //
+  // (b) MESMA CONVERSA. A chave era só `contact_id`, e o turno responde na
+  //     conversa PINADA no payload do job. O mesmo contato falando em dois canais
+  //     (WhatsApp e Instagram são conversas diferentes) tinha a segunda mensagem
+  //     pendurada num job que responde na PRIMEIRA — e a segunda conversa nunca
+  //     recebia turno nenhum. Aqui a mensagem não atrasava: sumia.
   if (knobs.debounceMs > 0) {
     const { rows: pendingRows } = await pool.query<{ id: string }>(
       `select id from job_queue
        where organization_id = $1 and contact_id = $2
-         and kind = 'inbound_turn' and status = 'pending' and run_after > now()
+         and kind = 'inbound_turn' and status = 'pending'
+         and run_after > now()
+         and run_after <= now() + make_interval(secs => $3 / 1000.0)
+         and payload->>'conversation_id' = $4
        limit 1`,
-      [event.organization_id, p.contact_id],
+      [event.organization_id, p.contact_id, knobs.debounceMs, p.conversation_id],
     );
     if (pendingRows[0]) {
       log.info('drain: rajada coalescida em job pendente', {
