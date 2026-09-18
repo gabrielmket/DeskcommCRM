@@ -112,7 +112,18 @@ export function useExcluirCampanha() {
 export function useEditarCampanha() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { id: string; nome?: string; tags?: string[] }) => {
+    mutationFn: async (input: {
+      id: string;
+      nome?: string;
+      /**
+       * Trocar template exige o PAR nome+idioma: é ele que identifica o
+       * template na Meta, e mandar só um faz a rota recusar com essa frase.
+       */
+      template_name?: string;
+      template_language?: string;
+      /** Presente = REMONTAR a lista com este filtro. Vazio = todos. */
+      tags?: string[];
+    }) => {
       const { id, ...resto } = input;
       return apiClient.patch<{ data: { id: string; peneira: unknown } }>(
         `/api/v1/broadcasts/${id}`,

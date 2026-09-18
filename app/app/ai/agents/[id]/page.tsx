@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { podeConfigurarChaveDeIa } from "@/lib/ai/custo-e-da-plataforma";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { listSelectableChannels } from "@/lib/channels/selectable";
 import { createClient } from "@/lib/supabase/server";
@@ -173,6 +174,7 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
         versions={versions}
         credentials={credentials}
         provedoresDaInstalacao={provedoresDaInstalacao()}
+        podeEscolherIa={podeConfigurarChaveDeIa(user)}
         channelSessions={channelSessions}
         funis={funis}
         cobertura={cobertura}

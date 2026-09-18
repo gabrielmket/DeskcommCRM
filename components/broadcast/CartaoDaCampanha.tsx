@@ -5,8 +5,11 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useT } from "@/hooks/i18n/useT";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
+import { useTemplates } from "@/hooks/channels/useTemplates";
+import { SeletorDeTags } from "./SeletorDeTags";
 import {
   useDestinatarios,
   useDispararCampanha,
@@ -44,6 +47,14 @@ export function CartaoDaCampanha({
   const tag = useTagDeIdioma();
   const [aberta, setAberta] = useState(false);
   const [renomeando, setRenomeando] = useState<string | null>(null);
+  /**
+   * `null` = não está editando. O estado guarda a EDIÇÃO EM CURSO, e não o que
+   * está gravado: sair sem salvar precisa deixar a campanha como estava, e um
+   * estado que espelhasse a campanha não saberia distinguir as duas coisas.
+   */
+  const [edicao, setEdicao] = useState<{ template: string; tags: string[] } | null>(null);
+  const { data: templatesRes } = useTemplates();
+  const aprovados = (templatesRes?.data.templates ?? []).filter((x) => x.status === "APPROVED");
 
   const disparar = useDispararCampanha();
   const excluir = useExcluirCampanha();
@@ -134,6 +145,26 @@ export function CartaoDaCampanha({
             <Button size="sm" variant="ghost" onClick={() => setRenomeando(c.nome)}>
               {t("Renomear")}
             </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                setEdicao((e) =>
+                  e
+                    ? null
+                    : {
+                        template: `${c.template_name}:${c.template_language}`,
+                        // As tags NÃO são recuperadas da campanha porque a
+                        // campanha não as guarda: ela guarda o RESULTADO da
+                        // peneira, não a pergunta que a produziu. Começar vazio
+                        // é honesto — e é por isso que salvar aqui REMONTA.
+                        tags: [],
+                      },
+                )
+              }
+            >
+              {edicao ? t("Fechar edição") : t("Editar")}
+            </Button>
             {/*
               Sem confirmação porque não há o que perder: rascunho nunca enviou
               nem cobrou, e a lista se remonta com um clique. Pedir confirmação
@@ -158,6 +189,89 @@ export function CartaoDaCampanha({
           </>
         ) : null}
       </div>
+
+      {/*
+        EDITAR = TROCAR O TEMPLATE E REMONTAR A LISTA.
+
+        Só rascunho chega aqui: depois do primeiro envio a campanha vira a
+        explicação de mensagens que chegaram e de débitos no extrato, e mudar o
+        template ali faria o extrato apontar para um texto que ninguém recebeu.
+
+        Remontar e não "ajustar": a lista é materializada na peneira, com
+        telefone e valores de cada contato no momento em que se montou. Mudar o
+        filtro é fazer outra pergunta ao banco, que devolve outro conjunto —
+        fingir que é edição esconderia que quem entrou e quem saiu mudou. Por
+        isso o aviso abaixo é explícito, e a resposta devolve a peneira nova.
+      */}
+      {edicao ? (
+        <div className="mt-3 space-y-3 rounded-md border border-border/60 bg-muted/30 p-3">
+          <div className="space-y-1">
+            {/*
+              `Label` e não `<label>` cru: no Tailwind 4 o `space-*` põe a margem
+              no filho ANTERIOR, e um `<label>` sem display declarado quebra o
+              espaçamento do container. `tests/unit/tailwind-tokens` cobra isso
+              — e foi ele que pegou esta linha.
+            */}
+            <Label className="text-xs" htmlFor={`tpl-${c.id}`}>
+              {t("Template aprovado")}
+            </Label>
+            <select
+              id={`tpl-${c.id}`}
+              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              value={edicao.template}
+              onChange={(e) => setEdicao({ ...edicao, template: e.target.value })}
+            >
+              {aprovados.map((x) => (
+                <option key={`${x.name}:${x.language}`} value={`${x.name}:${x.language}`}>
+                  {x.name} ({x.language})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <SeletorDeTags
+            selecionadas={edicao.tags}
+            onChange={(tags) => setEdicao({ ...edicao, tags })}
+            disabled={editar.isPending}
+          />
+
+          <p className="text-xs text-warning-fg">
+            {t("Salvar REMONTA a lista de destinatários com o filtro acima — quem estava antes e não passa no filtro novo sai.")}
+          </p>
+
+          <Button
+            size="sm"
+            disabled={editar.isPending}
+            onClick={() => {
+              const [nome, idioma] = edicao.template.split(":");
+              editar.mutate(
+                {
+                  id: c.id,
+                  template_name: nome,
+                  template_language: idioma,
+                  tags: edicao.tags,
+                },
+                {
+                  onSuccess: (r) => {
+                    setEdicao(null);
+                    const p = (r as { data?: { peneira?: { enviar: number } | null } })?.data
+                      ?.peneira;
+                    toast.success(
+                      p
+                        ? `${t("Lista remontada:")} ${p.enviar} ${t("destinatários")}`
+                        : t("Campanha atualizada."),
+                    );
+                  },
+                  onError: (e: unknown) =>
+                    toast.error(e instanceof Error ? e.message : t("Não consegui salvar.")),
+                },
+              );
+            }}
+          >
+            {editar.isPending ? t("Salvando…") : t("Salvar e remontar")}
+          </Button>
+        </div>
+      ) : null}
 
       {aberta ? (
         <div className="mt-3 rounded-md border border-border/60">

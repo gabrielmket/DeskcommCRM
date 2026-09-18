@@ -23992,6 +23992,39 @@ create trigger trg_org_voice_calls_set_updated_at
 
 notify pgrst, 'reload schema';
 
+-- ---- tags dos contatos (migration 0249) ----
+--
+-- 0249 — as tags que os contatos REALMENTE têm, com quantos em cada.
+--
+-- O filtro do disparador era texto livre, e nome errado devolvia lista vazia
+-- sem dizer por quê. A contagem é o que responde antes de custar: `vip (0)`
+-- diz na hora que aquela tag não rende campanha.
+--
+-- SECURITY INVOKER: a RLS de `contacts` decide o alcance, e `p_org` é filtro,
+-- não defesa. Anonimizado e fundido ficam de fora — o primeiro por dever legal,
+-- o segundo porque já virou outra linha.
+
+create or replace function public.fn_contact_tags(p_org uuid)
+returns table (tag text, quantos bigint)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select t as tag, count(*)::bigint as quantos
+    from public.contacts c
+    cross join lateral unnest(c.tags) as t
+   where c.organization_id = p_org
+     and c.is_anonymized = false
+     and c.is_merged_into is null
+   group by t
+   order by count(*) desc, t asc
+$$;
+
+revoke all on function public.fn_contact_tags(uuid) from public;
+grant execute on function public.fn_contact_tags(uuid) to authenticated, service_role;
+
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ ESTE BLOCO É, DE PROPÓSITO, O ÚLTIMO DO ARQUIVO. Apêndice novo entra ANTES
@@ -25045,5 +25078,8 @@ alter table public.platform_meta_pricing enable row level security;
 -- mesma doutrina de `platform_ai_ledger` e de `lib/ai/custo-e-da-plataforma.ts`.
 revoke all on public.platform_meta_pricing from anon, authenticated;
 grant select, insert, delete on public.platform_meta_pricing to service_role;
+
+
+
 
 notify pgrst, 'reload schema';

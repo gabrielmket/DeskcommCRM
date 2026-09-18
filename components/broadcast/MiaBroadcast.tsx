@@ -38,6 +38,7 @@ import {
 } from "@/hooks/useBroadcasts";
 import { formatCentsBRL } from "@/lib/money";
 import { CartaoDaCampanha } from "./CartaoDaCampanha";
+import { SeletorDeTags } from "./SeletorDeTags";
 
 const ROTULO_DO_STATUS: Record<Campanha["status"], string> = {
   rascunho: "Rascunho",
@@ -69,7 +70,7 @@ export function MiaBroadcast() {
 
   const [nome, setNome] = useState("");
   const [template, setTemplate] = useState("");
-  const [tags, setTags] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [valores, setValores] = useState<Record<string, string>>({});
   const [recemCriada, setRecemCriada] = useState<CampanhaCriada | null>(null);
 
@@ -117,10 +118,7 @@ export function MiaBroadcast() {
         valores_padrao: Object.fromEntries(
           slotsManuais.map((s) => [s.key, (valores[s.key] ?? "").trim()]),
         ),
-        tags: tags
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
+        tags,
         variavel_do_nome: "1",
       },
       {
@@ -128,6 +126,7 @@ export function MiaBroadcast() {
           setRecemCriada(r.data);
           setNome("");
           setValores({});
+          setTags([]);
         },
         onError: (e: unknown) => {
           toast.error(e instanceof Error ? e.message : t("Não consegui montar a campanha."));
@@ -179,18 +178,7 @@ export function MiaBroadcast() {
               </p>
             ) : null}
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="bc-tags">{t("Filtrar por tags (opcional)")}</Label>
-            <Input
-              id="bc-tags"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="vip, retomada"
-            />
-            <p className="text-xs text-muted-foreground">
-              {t("Vazio = todos os contatos com telefone.")}
-            </p>
-          </div>
+          <SeletorDeTags selecionadas={tags} onChange={setTags} disabled={criar.isPending} />
         </div>
 
         {/*

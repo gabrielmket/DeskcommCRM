@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { podeConfigurarChaveDeIa } from "@/lib/ai/custo-e-da-plataforma";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { listSelectableChannels } from "@/lib/channels/selectable";
 import { createClient } from "@/lib/supabase/server";
@@ -55,6 +56,7 @@ export default async function NewAgentPage() {
         mode="create"
         credentials={credentials}
         provedoresDaInstalacao={provedoresDaInstalacao()}
+        podeEscolherIa={podeConfigurarChaveDeIa(user)}
         channelSessions={channelSessions}
       />
     </div>

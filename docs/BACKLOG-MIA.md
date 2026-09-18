@@ -1,0 +1,121 @@
+# MIA — o que falta
+
+Atualizado em 18/09/2026. Ordenado por bloco; dentro de cada bloco, por valor.
+
+> Esta lista é viva. Item concluído sai daqui e vira linha no histórico do git.
+
+---
+
+## Fechado e no ar (`v1.21.0-mia.21`)
+
+Fatura da OpenAI (cron provado rodando sozinho) · metas e relatório de vendas ·
+reunião marcada e no-show · liberação por módulo · MIA Broadcast fases 1 e 2
+(carteira, motor, margem, templates pela plataforma) · webhook multi-WABA ·
+credencial do canal por service role · disparo virando mensagem na conversa ·
+ver destinatários com erro por linha · QR sem piscar · chave de IA fora da vista
+do cliente.
+
+---
+
+## Bloco A — Disparador: fechar o que ficou pela metade
+
+| # | o que | tamanho | por quê |
+|---|---|---|---|
+| A1 | **Seletor de tags** em vez de texto livre | pequeno | errar o nome devolve lista vazia sem dizer por quê — o mesmo tropeço da tag no lead |
+| A2 | **Editar campanha** completo (trocar template, remontar lista) | pequeno | a rota já aceita; a tela só oferece renomear |
+| A3 | **Agendar campanha** | pequeno | o worker já trata `status: agendada` e `agendado_para`, e nada na tela consegue criar uma |
+| A4 | **Gravar o custo que vem no webhook** e mostrar a quem paga | pequeno | o `pricing` da Meta chega em todo status e é descartado; hoje o cartão é do cliente, então o número é dele — ver `mia-modelo-de-cobranca` |
+| A5 | **Tela própria por campanha** | médio | inline funciona com 3 destinatários, não com 3.000 |
+| A6 | **Filtrar por tag do lead e etapa do funil** | médio | o que se quer segmentar mora no funil, não no contato |
+| A7 | **Editar/excluir template** | médio | a Meta permite os dois; a tela só cria e sincroniza |
+| A8 | **Cabeçalho com imagem/vídeo** e botões de link/telefone | grande | exige upload reencaminhável à Meta antes de submeter o template |
+
+---
+
+## Bloco B — Defeitos que queimam conversa de cliente
+
+| # | o que | tamanho | por quê |
+|---|---|---|---|
+| B1 | **A despedida de 6 segundos** | médio | o contato escreveu num canal e a régua se despediu no outro: o cancelamento é por conversa, não por contato |
+
+---
+
+## Bloco B2 — Pacing e alertas (auditoria de 18/09)
+
+Detalhe e evidências em `docs/audits/2026-09-18-pacing-janela-adiada-e-alertas-fantasma.md`.
+
+| # | o que | tamanho | por quê |
+|---|---|---|---|
+| B2-1 | **Alargar a janela reprograma turno adiado** (+ motivo do adiamento em coluna própria) | médio | é o único que deixa o produto sem saída pela tela; consertá-lo também fecha o alerta de janela |
+| B2-2 | **Gatilho de `updated_at` em `channel_knobs`** | minúsculo | hoje o campo mente com cara de verdade e faz a próxima investigação recomeçar enganada |
+| B2-3 | **Resolver `conhecimento_nao_indexado` ao indexar** + varrer quem fecha cada `kind` de alerta | pequeno | dois de dois auditados tinham problema |
+
+## Bloco C — Empresa (o CRM virar B2B de verdade)
+
+| # | o que | tamanho |
+|---|---|---|
+| C1 | Entidade **empresa** + vínculo do contato, com **cargo e setor** opcionais | maior |
+| C2 | **Modo B2B/B2C por organização** — cliente B2C nunca vê que empresa existe | incluído em C1 |
+| C3 | Adaptar **cartão do funil** e **painel do atendimento** | incluído em C1 |
+| C4 | **Fusão de empresas duplicadas** (contato já tem; empresa vai precisar) | incluído em C1 |
+| C5 | **A Rafa perguntar o nome da empresa** — sem isso o campo nasce vazio | pequeno, depende de C1 |
+| C6 | **Campos adicionais** por organização, em EMPRESA e em LEAD | médio, junto de C1 |
+
+Sobre o C6, pedido do Gabriel em 18/09: o cadastro precisa de campo livre além
+do núcleo. É o terceiro nível do desenho — **núcleo** (o que o sistema usa),
+**derivado** (o que ele calcula) e **livre** (o que cada cliente precisa).
+O que a clínica precisa não é o que a imobiliária precisa, e adivinhar isso no
+schema é como se acumula campo morto.
+
+Regra que segura o desenho: **a conversa é sempre com uma PESSOA**. WhatsApp é
+número de telefone; empresa é vínculo do contato, nunca substituto. Isso mantém
+inbox, janela de 24h e agente intocados.
+
+---
+
+## Bloco D — Canais
+
+| # | o que | tamanho | estado |
+|---|---|---|---|
+| D1 | **Ligar chamada de voz** (WaCalls) | pequeno | já construído; falta o contêiner no compose do EasyPanel, dois segredos e ativar por organização |
+| D2 | **Disparador fase 3** — cadastro embutido | — | bloqueado: depende de virar Tech Provider da Meta |
+| D3 | **Instagram Direct** | — | bloqueado na Meta |
+
+---
+
+## Bloco E — Plataforma e operação
+
+| # | o que | tamanho | por quê |
+|---|---|---|---|
+| E1 | **Aba "Uso"** do admin — custo por cliente | médio | é o bloco de otimização de custo; hoje se levanta na mão por SQL |
+| E2 | **Tela de modelo padrão da plataforma** | pequeno | hoje o padrão vem do `.env` e o modelo é escolhido agente a agente — não há como trocar o padrão de todos |
+| E3 | **Aba "Equipe"** do admin | médio | placeholder declarado na navegação e nunca construído |
+| E4 | **Ligar agregação de logs** na VPS | pequeno | Loki está zerado; sem log do servidor, defeito em produção é diagnosticado por eliminação |
+| E5 | ~~Desligar o workflow `release`~~ | — | feito em 18/09 |
+| E6 | **MCP de administração da plataforma** | médio | hoje implantar cliente é tela por tela; especificação fica para quando o item subir |
+
+Sobre o E6, pedido do Gabriel em 18/09. O que já se sabe do desenho:
+
+- O MCP atual é **por organização** (o token carrega um `organizationId` e um
+  papel) e o catálogo só tem operações de dentro de um cliente. Administração
+  não existe nele — é **servidor novo**, não extensão.
+- As rotas de administração **já existem e já exigem admin de plataforma**
+  (`/api/v1/admin/tenants`, `/admin/carteira`, módulos). O MCP é camada fina
+  por cima; a permissão não precisa ser reinventada.
+- ⚠️ "Acesso total" é o que cria o estrago: o token de hoje erra dentro de um
+  cliente, um de plataforma erra em todos — e mora num arquivo de configuração
+  que qualquer sessão carrega. Escopar pelo que se repete ao implantar (criar
+  organização, liberar módulo, conectar canal, definir preço, lançar crédito,
+  criar template) resolve o mesmo problema sem o raio.
+- Leitura livre, escrita nomeada e auditada com o token como autor.
+- **Ordem:** rende mais DEPOIS do bloco C (empresa e campos adicionais) — aí dá
+  para implantar um cliente inteiro por conversa, cadastro incluído.
+
+---
+
+## Fora do meu alcance — do Gabriel
+
+- **Revisar o preço ao cliente** (R$ 0,12 nos testes) agora que se sabe que o
+  custo da Meta é do cliente, não nosso
+- **Virar Tech Provider** da Meta — destrava D2 e D3
+- **Conferir a fatura da Meta** depois dos testes, para saber o valor unitário real

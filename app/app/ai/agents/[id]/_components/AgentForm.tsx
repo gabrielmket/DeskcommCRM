@@ -84,6 +84,18 @@ interface BaseProps {
    * conseguia salvar nada.
    */
   provedoresDaInstalacao?: string[];
+  /**
+   * Quem está olhando pode escolher provedor, modelo e chave?
+   *
+   * Em instalação gerenciada, NÃO: a conta do provedor é paga por quem opera a
+   * plataforma (a regra e o porquê estão em `lib/ai/custo-e-da-plataforma.ts`),
+   * e o modelo é a escolha que mais mexe nessa conta. Deixar o cliente trocar
+   * `gpt-5.6` por algo maior é deixá-lo escolher quanto NÓS pagamos.
+   *
+   * Opcional e com padrão `false` de propósito: uma tela nova que esqueça de
+   * passar a prop esconde o bloco, em vez de expor a chave por omissão.
+   */
+  podeEscolherIa?: boolean;
   channelSessions: ChannelSessionLite[];
   routerMembership?: { routerId: string; routerName: string } | null;
   readOnly?: boolean;
@@ -689,7 +701,22 @@ export function AgentForm(props: Props) {
             </div>
           </Card>
 
-          {/* Provider + credential + model */}
+          {/*
+            Provider + credential + model — SÓ para quem paga a conta.
+
+            As três coisas deste cartão são decisões de custo da plataforma, e a
+            do meio é a mais cara: trocar o modelo muda o que NÓS pagamos por
+            atendimento. A chave nem deveria ser mencionada — mostrar
+            "Padrão · ...TYcA · validada" entrega os últimos dígitos da nossa
+            credencial e o estado da nossa conta a quem comprou atendimento.
+
+            Mesmo predicado do onboarding e do custo, de propósito: se um dia a
+            regra mudar, muda num lugar só.
+
+            O bloco some, mas os VALORES continuam no formulário e vão no save
+            normalmente — esconder o controle não é zerar o campo.
+          */}
+          {props.podeEscolherIa ? (
           <Card className="space-y-3 p-4">
             <h3 className="text-sm font-medium">{t("A inteligência que ele usa")}</h3>
             <div className="space-y-1">
@@ -750,6 +777,7 @@ export function AgentForm(props: Props) {
               </p>
             ) : null}
           </Card>
+          ) : null}
 
           {/* WhatsApp session */}
           <Card className="space-y-3 p-4">
