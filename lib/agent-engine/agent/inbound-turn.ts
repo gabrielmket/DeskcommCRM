@@ -1661,6 +1661,11 @@ async function executarTurnoDoAgente(
         acquiredAt: claimOfJob(liveJob())?.acquired_at,
         delayMs: Math.max(abertura.getTime() - agora.getTime(), 1_000),
         reason: 'fora da janela anti-ban de envio — turno adiado para a abertura',
+        // O motivo em COLUNA, e não só na frase acima: é por ele que o
+        // `PUT /api/v1/ai/pacing` acha estes jobs quando o operador alarga a
+        // janela. Sem ele, alargar a janela pela tela não reprograma nada e o
+        // produto fica sem saída (auditoria de 18/09, defeito 2).
+        motivo: 'janela_anti_ban',
       });
       runLog.info('turno adiado — fora da janela anti-ban de envio', {
         janela: `${knobs.windowStartHour}h-${knobs.windowEndHour}h`,
@@ -1773,6 +1778,10 @@ async function executarTurnoDoAgente(
         delayMs: esperaMs,
         reason:
           'fora do horário de funcionamento do agente — turno adiado para a abertura da janela',
+        // NÃO é `janela_anti_ban`: esta espera depende da versão publicada do
+        // agente, não do knob do canal. Alargar a janela anti-ban e trazer este
+        // turno junto o adiaria de novo no mesmo segundo.
+        motivo: 'horario_do_agente',
       });
       runLog.info(
         'turno adiado — fora do horário de funcionamento configurado na versão publicada',

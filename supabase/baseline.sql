@@ -25080,6 +25080,47 @@ revoke all on public.platform_meta_pricing from anon, authenticated;
 grant select, insert, delete on public.platform_meta_pricing to service_role;
 
 
+-- ---- channel_knobs.updated_at para de mentir (migration 0250) ----
+-- A coluna tinha `default now()` e nada a atualizava: a ficha de anti-ban
+-- alterada às 04:36 continuava dizendo 03:18, e uma investigação de produção
+-- concluiu por isso que a janela já estava aberta quando o turno foi adiado.
+-- GATILHO e não conserto do upsert: o gatilho pega `psql` direto e qualquer rota
+-- futura. `fn_set_updated_at()` já existe no corpo deste arquivo — nada é criado
+-- aqui, e por isso este bloco não tem nada a ver com a varredura de anon.
+drop trigger if exists trg_channel_knobs_updated_at on public.channel_knobs;
+create trigger trg_channel_knobs_updated_at
+  before update on public.channel_knobs
+  for each row execute function public.fn_set_updated_at();
+
+comment on column public.channel_knobs.updated_at is
+  'Carimbado pelo gatilho trg_channel_knobs_updated_at (migration 0250), nunca pelo chamador.';
+
+
+-- ---- motivo do adiamento do job em coluna própria (migration 0251) ----
+-- O motivo vivia numa frase de `last_error`, escrita para gente ler. Filtrar
+-- jobs por texto de mensagem quebra calado no dia em que alguém melhorar a
+-- frase — e é dessa filtragem que depende reprogramar turno adiado quando o
+-- operador alarga a janela anti-ban. Vocabulário FECHADO porque cada valor é uma
+-- condição diferente: só `janela_anti_ban` fica obsoleto quando o knob do canal
+-- muda. Toda linha existente fica NULL, então não há backfill a fazer.
+alter table public.job_queue
+  add column if not exists deferred_reason text;
+
+alter table public.job_queue
+  drop constraint if exists job_queue_deferred_reason_check;
+alter table public.job_queue
+  add constraint job_queue_deferred_reason_check
+  check (
+    deferred_reason is null
+    or deferred_reason in ('janela_anti_ban', 'horario_do_agente', 'canal_fora')
+  );
+
+create index if not exists idx_job_queue_adiado_por_motivo
+  on public.job_queue (organization_id, deferred_reason, run_after)
+  where status = 'pending' and deferred_reason is not null;
+
+comment on column public.job_queue.deferred_reason is
+  'POR QUE este job esta com run_after no futuro, em vocabulario fechado. O texto legivel continua em last_error; esta coluna existe para ser FILTRADA. Par em lib/agent-engine/queue/queue.ts (MOTIVOS_DE_ADIAMENTO), cobrado por tests/invariants/vocabulario-banco-x-typescript.test.ts.';
 
 
 notify pgrst, 'reload schema';

@@ -4947,6 +4947,7 @@ export type Database = {
           attempts: number
           contact_id: string | null
           created_at: string
+          deferred_reason: string | null
           id: string
           kind: string
           last_error: string | null
@@ -4964,6 +4965,7 @@ export type Database = {
           attempts?: number
           contact_id?: string | null
           created_at?: string
+          deferred_reason?: string | null
           id?: string
           kind: string
           last_error?: string | null
@@ -4981,6 +4983,7 @@ export type Database = {
           attempts?: number
           contact_id?: string | null
           created_at?: string
+          deferred_reason?: string | null
           id?: string
           kind?: string
           last_error?: string | null

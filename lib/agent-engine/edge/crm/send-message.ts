@@ -237,6 +237,10 @@ export async function applySendOutcome(
         delayMs: knobs.queuedRetryDelayMs,
         acquiredAt: job.jobClaim?.acquired_at,
         reason: 'sessão do canal fora (resposta queued) — reagendado sem consumir attempts',
+        // Depende de a sessão WAHA voltar, não do relógio: alargar a janela
+        // anti-ban não muda nada aqui, e reprogramar junto traria o turno de
+        // volta para tomar o mesmo `queued`.
+        motivo: 'canal_fora',
       });
       return { action: 'requeued', job: requeued };
     }

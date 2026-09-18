@@ -114,6 +114,7 @@ function fakeJob(caseId: string, action: string, body?: string): JobRow {
     attempts: 0,
     max_attempts: 5,
     last_error: null,
+    deferred_reason: null,
     locked_by: "test-worker",
     locked_at: new Date(),
     created_at: new Date(),

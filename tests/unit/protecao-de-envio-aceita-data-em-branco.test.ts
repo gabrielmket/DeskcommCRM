@@ -91,6 +91,7 @@ function makeDb(knobsIniciais: Linha | null = null): Registro {
 
   class Q implements PromiseLike<unknown> {
     private filtros: Array<[string, unknown]> = [];
+    private comparacoes: Array<[string, unknown]> = [];
 
     constructor(
       private readonly table: string,
@@ -109,6 +110,18 @@ function makeDb(knobsIniciais: Linha | null = null): Registro {
       this.filtros.push([col, val]);
       return this;
     }
+    /**
+     * `gt` entra numa lista SEPARADA de propósito: ele não é igualdade, e jogá-lo
+     * em `filtros` faria `casa()` comparar `run_after > x` como se fosse
+     * `run_after === x`. Existe porque o PUT passou a reprogramar os turnos
+     * adiados pela janela (`reprogramarTurnosAdiadosPelaJanela`) — sem este
+     * método o dublê explodia, e a rota caía no `catch` daquela função em vez de
+     * exercitar o caminho real.
+     */
+    gt(col: string, val: unknown): this {
+      this.comparacoes.push([col, val]);
+      return this;
+    }
     maybeSingle(): this {
       return this;
     }
@@ -124,9 +137,15 @@ function makeDb(knobsIniciais: Linha | null = null): Registro {
       }
 
       if (this.op === "update") {
+        // A fila não tem linhas neste dublê: nenhum turno foi adiado nestes
+        // cenários, então a reprogramação da janela toca zero jobs. `[]` e não
+        // `null` porque é isso que o PostgREST devolve num `update ... select`
+        // que não casou linha nenhuma — e a rota conta `data.length`.
+        if (this.table === "job_queue") return { data: [], error: null };
         if (this.casa(registro.sessao)) Object.assign(registro.sessao, this.patch);
         return { data: null, error: null };
       }
+      void this.comparacoes;
 
       const carga = this.patch ?? {};
       registro.upserts.push(carga);

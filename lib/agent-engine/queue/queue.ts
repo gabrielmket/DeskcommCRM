@@ -27,6 +27,29 @@ export type JobKind =
   | 'approved_reply';
 export type JobStatus = 'pending' | 'running' | 'done' | 'failed' | 'dead';
 
+/**
+ * POR QUE um job está com `run_after` no futuro — vocabulário FECHADO, espelhado
+ * no CHECK de `job_queue.deferred_reason` (migration 0251) e cobrado por
+ * `tests/invariants/vocabulario-banco-x-typescript.test.ts`.
+ *
+ * O texto legível continua indo para `last_error`. Esta lista existe para ser
+ * FILTRADA, e a distinção entre os membros é a razão de ela existir:
+ *
+ *  • `janela_anti_ban` .... depende do RELÓGIO e do knob do canal. É o único que
+ *                           fica obsoleto no instante em que alguém alarga a
+ *                           janela pela tela — e é exatamente esse o job que o
+ *                           `PUT /api/v1/ai/pacing` reprograma.
+ *  • `horario_do_agente` .. depende da versão publicada do agente. Trazer junto
+ *                           com a janela o adiaria de novo no mesmo segundo.
+ *  • `canal_fora` ......... depende de a sessão WAHA voltar. Idem.
+ *
+ * Antes da 0251 o motivo só existia dentro da frase de `last_error`. Filtrar por
+ * texto de mensagem funcionaria hoje e quebraria CALADO no dia em que alguém
+ * melhorasse a frase — que é a coisa mais inocente que se faz num arquivo.
+ */
+export const MOTIVOS_DE_ADIAMENTO = ['janela_anti_ban', 'horario_do_agente', 'canal_fora'] as const;
+export type MotivoDeAdiamento = (typeof MOTIVOS_DE_ADIAMENTO)[number];
+
 export interface JobRow {
   id: string;
   organization_id: string;
@@ -40,6 +63,8 @@ export interface JobRow {
   attempts: number;
   max_attempts: number;
   last_error: string | null;
+  /** Ver `MotivoDeAdiamento`. NULL = este job nunca foi adiado. */
+  deferred_reason: MotivoDeAdiamento | null;
   locked_by: string | null;
   locked_at: Date | null;
   /** Texto original da aquisição; Date do driver perde microssegundos. */
@@ -368,17 +393,28 @@ export async function rescheduleJob(
   db: Queryable,
   jobId: string,
   workerId: string,
-  opts: { delayMs: number; reason: string; acquiredAt?: string },
+  opts: { delayMs: number; reason: string; motivo?: MotivoDeAdiamento; acquiredAt?: string },
 ): Promise<JobRow | null> {
+  // `motivo` é gravado SEMPRE, inclusive como NULL quando o chamador não declara:
+  // um adiamento novo sobrescreve o motivo do anterior, e deixar o antigo colado
+  // faria a rota de pacing reprogramar job que já está parado por outra condição.
   const { rows } = await db.query<JobRow>(
     `update job_queue
      set status = 'pending', locked_by = null, locked_at = null,
          run_after = now() + ($3 * interval '1 millisecond'),
          attempts = greatest(attempts - 1, 0),
-         last_error = $4
+         last_error = $4,
+         deferred_reason = $6
      where id = $1 and status = 'running' and locked_by = $2 and ($5::timestamptz is null or locked_at=$5)
      returning *`,
-    [jobId, workerId, opts.delayMs, normalizeError(opts.reason), opts.acquiredAt ?? null],
+    [
+      jobId,
+      workerId,
+      opts.delayMs,
+      normalizeError(opts.reason),
+      opts.acquiredAt ?? null,
+      opts.motivo ?? null,
+    ],
   );
   return rows[0] ?? null;
 }

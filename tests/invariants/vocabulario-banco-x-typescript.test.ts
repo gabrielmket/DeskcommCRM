@@ -270,6 +270,24 @@ const PARES: Array<{
     arquivo: "lib/schemas/team.ts",
     simbolo: "ROLES",
   },
+  {
+    tabela: "job_queue",
+    coluna: "deferred_reason",
+    // lib/agent-engine/queue/queue.ts → MOTIVOS_DE_ADIAMENTO (tupla `as const`).
+    //
+    // Nasce no MESMO commit da migration 0251 — a lição desta lista é que todos
+    // os pares que divergiram divergiram por terem nascido sozinhos.
+    //
+    // O que está em jogo aqui não é um rótulo de tela: é QUEM É REPROGRAMADO. O
+    // `PUT /api/v1/ai/pacing` traz para agora os turnos adiados por
+    // `janela_anti_ban` e deixa parados os adiados por `horario_do_agente` e
+    // `canal_fora`, que dependem de outra condição. Um valor que exista só no
+    // TypeScript vira `23514` dentro do `rescheduleJob` — no caminho em que o
+    // turno está sendo adiado, ou seja, exatamente quando a mensagem do cliente
+    // depende de o adiamento dar certo.
+    arquivo: "lib/agent-engine/queue/queue.ts",
+    simbolo: "MOTIVOS_DE_ADIAMENTO",
+  },
 ];
 
 /** Tira um nível de parênteses externos, se ele envolver a expressão inteira. */

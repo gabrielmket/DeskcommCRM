@@ -1,4 +1,8 @@
 import { requireSupportWrite } from "@/lib/impersonate/support";
+import {
+  mexeuNaJanela,
+  reprogramarTurnosAdiadosPelaJanela,
+} from "@/lib/ai/pacing/reprogramar-adiados";
 /**
  * Épico Operação Visível (F2ii) — knobs do anti-ban por conexão.
  *
@@ -196,13 +200,33 @@ export async function PUT(req: NextRequest): Promise<Response> {
     }
   }
 
+  // O LAÇO QUE FALTAVA: mexer na janela reavalia quem estava esperando por ela.
+  //
+  // Sem isto, o turno adiado fica congelado no `run_after` calculado com os knobs
+  // ANTIGOS — e alargar a janela pela tela não produz efeito nenhum. Medido em
+  // produção em 18/09/2026: o operador alargou para 0h–23h, o job continuou
+  // marcado para as 7h, e a conclusão foi que a configuração não funciona.
+  //
+  // Só quando um campo de JANELA veio no PUT: mudar só o intervalo entre envios
+  // não destrava turno nenhum, e mexer na fila sem motivo é ruído.
+  const turnosReprogramados = mexeuNaJanela(knobFields)
+    ? await reprogramarTurnosAdiadosPelaJanela({
+        organizationId: org.orgId,
+        channelSessionId: channel_session_id,
+      })
+    : 0;
+
   await audit({
     action: "ai.pacing_knobs_updated",
     actorUserId: authUser.id,
     organizationId: org.orgId,
     resourceType: "channel_knobs",
     resourceId: channel_session_id,
-    metadata: { ...knobFields, daily_message_limit: daily_message_limit ?? null },
+    metadata: {
+      ...knobFields,
+      daily_message_limit: daily_message_limit ?? null,
+      turnos_reprogramados: turnosReprogramados,
+    },
   });
 
   const { data: savedRow } = await admin
@@ -212,7 +236,13 @@ export async function PUT(req: NextRequest): Promise<Response> {
     .eq("channel_session_id", channel_session_id)
     .maybeSingle();
   return ok(
-    { channel_session_id, ...knobsView((savedRow as unknown as ChannelKnobsRow) ?? null) },
+    {
+      channel_session_id,
+      ...knobsView((savedRow as unknown as ChannelKnobsRow) ?? null),
+      // `null` é "não consegui conferir", e não "nenhum" — a tela precisa poder
+      // dizer as duas coisas. Ver `reprogramarTurnosAdiadosPelaJanela`.
+      turnos_reprogramados: turnosReprogramados,
+    },
     { requestId },
   );
 }
