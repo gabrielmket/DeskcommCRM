@@ -46,10 +46,23 @@ export function usePacingKnobs(enabled = true) {
   });
 }
 
+/**
+ * O que o PUT devolve além dos knobs salvos.
+ *
+ * `turnos_reprogramados` é quantos atendimentos estavam PARADOS esperando a
+ * janela e voltaram para a fila agora. `null` é "não consegui conferir", e a
+ * tela precisa saber dizer isso — afirmar "nenhum" sem ter medido é o defeito
+ * que `channel_knobs.updated_at` custou uma hora para ensinar.
+ */
+export interface PacingKnobsUpdateResult {
+  data: { channel_session_id: string; turnos_reprogramados: number | null };
+}
+
 export function useUpdatePacingKnobs() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: PacingKnobsUpdate) => apiClient.put("/api/v1/ai/pacing", body),
+    mutationFn: (body: PacingKnobsUpdate) =>
+      apiClient.put<PacingKnobsUpdateResult>("/api/v1/ai/pacing", body),
     onSettled: () => qc.invalidateQueries({ queryKey: ["pacing-knobs"] }),
   });
 }

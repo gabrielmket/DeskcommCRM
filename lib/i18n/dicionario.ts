@@ -2147,6 +2147,12 @@ export const DICIONARIO: Traducoes = {
   "agora usa": { es: "ahora usa" },
   "aprendido automaticamente": { es: "aprendido automáticamente" },
   "anotado pela IA": { es: "anotado por la IA" },
+  "Não consegui conferir se havia atendimento parado esperando a janela.": {
+    es: "No pude comprobar si había atención detenida esperando la ventana.",
+  },
+  "Atendimentos que estavam esperando a janela voltaram para a fila:": {
+    es: "Atenciones que estaban esperando la ventana volvieron a la cola:",
+  },
   ativa: { es: "activa" },
   "atualizada em": { es: "actualizada el" },
   caracteres: { es: "caracteres" },

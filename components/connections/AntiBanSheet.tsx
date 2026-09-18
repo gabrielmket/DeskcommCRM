@@ -93,7 +93,7 @@ export function AntiBanSheet({ item, canWrite, onClose }: Props) {
 
   const handleSave = async () => {
     try {
-      await update.mutateAsync({
+      const resposta = await update.mutateAsync({
         channel_session_id: item.channel_session.id,
         window_start_hour: intOrNull(form.window_start_hour),
         window_end_hour: intOrNull(form.window_end_hour),
@@ -117,7 +117,28 @@ export function AntiBanSheet({ item, canWrite, onClose }: Props) {
             : new Date(`${form.numero_em_uso_desde}T12:00:00.000Z`).toISOString(),
         skip_warmup: form.pular_aquecimento,
       });
-      toast.success(t("Proteção de envio atualizada."));
+      // A SAÍDA PELA TELA. Alargar a janela e não ver nada acontecer foi o
+      // defeito inteiro da auditoria de 18/09: o operador mexia na configuração
+      // certa, o sistema não respondia, e ele concluía que ela não funciona.
+      // Agora ele lê quantos atendimentos voltaram para a fila — e, quando não
+      // deu para conferir, lê ISSO, em vez de um "nenhum" que ninguém mediu.
+      const soltos = resposta.data.turnos_reprogramados;
+      if (soltos === null) {
+        toast.success(
+          t("Proteção de envio atualizada.") +
+            " " +
+            t("Não consegui conferir se havia atendimento parado esperando a janela."),
+        );
+      } else if (soltos > 0) {
+        toast.success(
+          t("Proteção de envio atualizada.") +
+            " " +
+            t("Atendimentos que estavam esperando a janela voltaram para a fila:") +
+            ` ${soltos}.`,
+        );
+      } else {
+        toast.success(t("Proteção de envio atualizada."));
+      }
       onClose();
     } catch (err) {
       toast.error(err instanceof ApiError ? t(err.message) : t("Não foi possível salvar."));
