@@ -140,3 +140,86 @@ condição que o criou.
 `lib/channels/meta/credenciais-da-org.ts` e no dedup de eco: *peça pronta e
 nunca ligada*. Aqui é a variação temporal — **ligada uma vez e nunca
 revisitada**.
+
+---
+
+# Segunda rodada — 18/09/2026, implantação do tenant Academia Reativa
+
+Três achados novos. O primeiro estava no relato original desta sessão e não
+sobreviveu à reescrita; os outros dois apareceram configurando o segundo cliente.
+
+## 4. Turno adiado vira ralo: a mensagem seguinte do contato some dentro dele
+
+**O mais grave da série, e o único sem saída pela tela.**
+
+**Evidência de banco (Body Fit):** quatro mensagens inbound do mesmo contato
+(04:36:14, 04:51:55, 04:58:04, 05:01:50) e **um único** job na fila, o das 04:36,
+`pending`, `run_after = 10:00Z`. `llm_calls` vazio: o modelo nunca foi chamado.
+
+**Causa.** A coalescência em `lib/agent-engine/edge/crm/drain.ts:379`:
+
+```sql
+select id from job_queue
+where organization_id = $1 and contact_id = $2
+  and kind = 'inbound_turn' and status = 'pending' and run_after > now()
+```
+
+Existindo job pendente com `run_after` futuro, a mensagem entra de carona e o
+evento vira `processado`. A regra foi desenhada para o debounce de rajada
+(segundos) e não distingue disso um job adiado por janela para daqui a cinco horas,
+que satisfaz a mesma condição.
+
+**Por que importa.** Enquanto o turno está adiado, o contato entra num ralo: tudo
+que ele escrever some, sem turno, sem log de modelo, sem alerta. Repetir a
+mensagem, primeira reação de qualquer pessoa, alimenta o ralo em vez de sair dele.
+Em cliente real, o lead que escreve às 22h30 e insiste três vezes só é atendido às
+7h, e o histórico mostra uma pessoa falando sozinha a noite inteira.
+
+**Correção sugerida.** Coalescer apenas quando o job pendente está dentro da janela
+de debounce (`run_after <= now() + debounceMs`). Fora disso, enfileirar turno novo
+ou antecipar o existente — mas a mensagem não pode desaparecer sem deixar trabalho.
+
+## 5. `crm_save_org_memory` nunca funcionou — falha 100% das vezes
+
+**Evidência.** Cinco chamadas pelo MCP, cinco falhas idênticas:
+`gravar_memoria_falhou: new row for relation "org_memory_entries" violates check
+constraint "org_memory_entries_source_check"`.
+
+**Causa.** O handler em `lib/mcp/tools/evolucao.ts:213` insere `source: "agent"`.
+A tabela (`supabase/baseline.sql:7793`) declara
+`source text not null check (source in ('manual', 'flywheel'))`. O valor que a
+ferramenta escreve não está na lista: é impossível a chamada dar certo, com
+qualquer entrada.
+
+**Agravante.** O erro cru do Postgres volta como resultado da tool, ou seja, chega
+ao modelo com nome de tabela e de constraint dentro. É exatamente o tipo de texto
+que `TRANSPARENCIA_SYSTEM_BLOCK` existe para impedir que chegue ao lead.
+
+**Correção sugerida.** Decidir qual é a origem certa e alinhar os dois lados: ou o
+check passa a aceitar `'agent'` (e a tela ganha como distinguir o que a IA anotou,
+que é o propósito declarado no comentário da ferramenta), ou o handler grava
+`'manual'`. A primeira respeita a intenção; a segunda é de uma linha.
+
+**Nota de método.** Uma ferramenta que não pode funcionar em nenhum caminho não é
+regressão, é peça nunca exercitada. Vale um teste de integração que chame cada tool
+de escrita uma vez contra o banco real de teste — este defeito morreria no primeiro.
+
+## 6. Proteção de envio não segue o número quando ele troca de tenant
+
+**Evidência.** O mesmo chip físico (553175148146) foi desconectado da Body Fit e
+conectado na Reativa. Na Body Fit havia linha em `channel_knobs` com janela 0h–23h
+e `number_activated_at` de março. Na Reativa, `channel_knobs` não tem linha nenhuma:
+janela 7h–22h e idade zero, ou seja, teto de 20 envios por aquecimento.
+
+**Causa.** A chave de `channel_knobs` é `(organization_id, channel_session_id)`, e
+trocar de tenant cria sessão nova. Correto por construção — mas invisível.
+
+**Por que importa.** Quem acabou de configurar a proteção de envio acha que
+configurou **o número**. Ele reconecta o mesmo chip em outro tenant e cai de novo na
+janela fechada e no cap de 20, sem nenhum aviso de que a configuração ficou para
+trás. Somado ao defeito 4, o operador perde a noite: o teste não responde, ele mexe
+na janela, e as mensagens que mandou enquanto isso já sumiram no ralo.
+
+**Correção sugerida.** Ao conectar um número cujo `phone_number` já existe em outra
+sessão da instalação, oferecer herdar os knobs dela (ou ao menos avisar que o número
+é conhecido e nasceu com os padrões). Nada disso muda regra: muda o silêncio.
